@@ -1,0 +1,132 @@
+{
+    "paths": {
+        "data_dir": "Data",
+        "model_dir": "model"
+    },
+    "model_params": {
+        "n_estimators": 200,
+        "max_depth": 30,
+        "min_samples_split": 5,
+        "n_jobs": -1,
+        "random_state": 42,
+        "class_weight": "balanced"
+    },
+    "features": {
+        "numeric": [
+            "Age",
+            "BP_Systolic",
+            "BP_Diastolic",
+            "Heart Rate",
+            "Temperature"
+        ],
+        "categorical": [
+            "Gender"
+        ],
+        "text": "Detailed_Symptoms"
+    },
+    "thresholds": {
+        "bp_systolic": {
+            "normal_min": 90,
+            "normal_max": 140,
+            "critical_min": 80,
+            "critical_max": 180
+        },
+        "bp_diastolic": {
+            "normal_min": 60,
+            "normal_max": 90,
+            "critical_min": 50,
+            "critical_max": 110
+        },
+        "heart_rate": {
+            "normal_min": 60,
+            "normal_max": 100,
+            "critical_min": 50,
+            "critical_max": 120
+        },
+        "temperature": {
+            "normal_min": 96.0,
+            "normal_max": 100.4,
+            "critical_min": 95.0,
+            "critical_max": 103.0
+        }
+    },
+    "specialty_map": {
+        "Myocardial Infarction": "Cardiology",
+        "Arrhythmia": "Cardiology",
+        "Hypertension": "Cardiology",
+        "Coronary Artery Disease": "Cardiology",
+        "Heart Failure": "Cardiology",
+        "Psoriasis": "Dermatology",
+        "Acne": "Dermatology",
+        "Skin Infection": "Dermatology",
+        "Eczema": "Dermatology",
+        "Hypothyroidism": "Endocrinology",
+        "PCOS": "Endocrinology",
+        "Hyperthyroidism": "Endocrinology",
+        "Diabetes": "Endocrinology",
+        "Otitis Media": "ENT",
+        "Sinusitis": "ENT",
+        "Tonsillitis": "ENT",
+        "Hearing Loss": "ENT",
+        "Multiple Sclerosis": "Neurology",
+        "Parkinson's Disease": "Neurology",
+        "Epilepsy": "Neurology",
+        "Stroke": "Neurology",
+        "Migraine": "Neurology",
+        "Malnutrition": "Nutrition & Dietetics",
+        "Eating Disorder": "Nutrition & Dietetics",
+        "Obesity": "Nutrition & Dietetics",
+        "Vitamin Deficiency": "Nutrition & Dietetics",
+        "Leukemia": "Oncology",
+        "Breast Cancer": "Oncology",
+        "Lymphoma": "Oncology",
+        "Lung Cancer": "Oncology",
+        "Inflammation": "Pathology",
+        "Anemia": "Pathology",
+        "Clotting Disorder": "Pathology",
+        "Infection": "Pathology",
+        "COPD": "Pulmonology",
+        "Pneumonia": "Pulmonology",
+        "Tuberculosis": "Pulmonology",
+        "Asthma": "Pulmonology"
+    },
+    "disease_base_risk": {
+        "Myocardial Infarction": "High",
+        "Heart Failure": "High",
+        "Stroke": "High",
+        "Pneumonia": "High",
+        "Leukemia": "High",
+        "Lung Cancer": "High",
+        "Lymphoma": "High",
+        "Clotting Disorder": "High",
+        "Hypertension": "Medium",
+        "Coronary Artery Disease": "Medium",
+        "Arrhythmia": "Medium",
+        "Diabetes": "Medium",
+        "Hyperthyroidism": "Medium",
+        "Hypothyroidism": "Medium",
+        "Multiple Sclerosis": "Medium",
+        "Parkinson's Disease": "Medium",
+        "Epilepsy": "Medium",
+        "COPD": "Medium",
+        "Asthma": "Medium",
+        "Tuberculosis": "Medium",
+        "Anemia": "Medium",
+        "Infection": "Medium",
+        "Inflammation": "Medium",
+        "Obesity": "Medium",
+        "Eating Disorder": "Medium",
+        "Malnutrition": "Medium",
+        "Psoriasis": "Low",
+        "Acne": "Low",
+        "Skin Infection": "Low",
+        "Eczema": "Low",
+        "Otitis Media": "Low",
+        "Sinusitis": "Low",
+        "Tonsillitis": "Low",
+        "Hearing Loss": "Low",
+        "Migraine": "Low",
+        "Vitamin Deficiency": "Low",
+        "PCOS": "Low"
+    }
+}

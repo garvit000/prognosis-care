@@ -34,65 +34,16 @@ from sklearn.metrics import (
     confusion_matrix,
 )
 import joblib
+from config_loader import config
 
 warnings.filterwarnings("ignore")
 
 # ── paths ──────────────────────────────────────────────────────────────────────
+# ── paths ──────────────────────────────────────────────────────────────────────
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.path.join(BASE_DIR, "Data")
-MODEL_DIR = os.path.join(BASE_DIR, "model")
+DATA_DIR = os.path.join(BASE_DIR, config["paths"]["data_dir"])
+MODEL_DIR = os.path.join(BASE_DIR, config["paths"]["model_dir"])
 os.makedirs(MODEL_DIR, exist_ok=True)
-
-# Disease → Specialty mapping (for predict.py)
-SPECIALTY_MAP = {
-    # Cardiology
-    "Myocardial Infarction": "Cardiology",
-    "Arrhythmia": "Cardiology",
-    "Hypertension": "Cardiology",
-    "Coronary Artery Disease": "Cardiology",
-    "Heart Failure": "Cardiology",
-    # Dermatology
-    "Psoriasis": "Dermatology",
-    "Acne": "Dermatology",
-    "Skin Infection": "Dermatology",
-    "Eczema": "Dermatology",
-    # Endocrinology
-    "Hypothyroidism": "Endocrinology",
-    "PCOS": "Endocrinology",
-    "Hyperthyroidism": "Endocrinology",
-    "Diabetes": "Endocrinology",
-    # ENT
-    "Otitis Media": "ENT",
-    "Sinusitis": "ENT",
-    "Tonsillitis": "ENT",
-    "Hearing Loss": "ENT",
-    # Neurology
-    "Multiple Sclerosis": "Neurology",
-    "Parkinson's Disease": "Neurology",
-    "Epilepsy": "Neurology",
-    "Stroke": "Neurology",
-    "Migraine": "Neurology",
-    # Nutrition & Dietetics
-    "Malnutrition": "Nutrition & Dietetics",
-    "Eating Disorder": "Nutrition & Dietetics",
-    "Obesity": "Nutrition & Dietetics",
-    "Vitamin Deficiency": "Nutrition & Dietetics",
-    # Oncology
-    "Leukemia": "Oncology",
-    "Breast Cancer": "Oncology",
-    "Lymphoma": "Oncology",
-    "Lung Cancer": "Oncology",
-    # Pathology
-    "Inflammation": "Pathology",
-    "Anemia": "Pathology",
-    "Clotting Disorder": "Pathology",
-    "Infection": "Pathology",
-    # Pulmonology
-    "COPD": "Pulmonology",
-    "Pneumonia": "Pulmonology",
-    "Tuberculosis": "Pulmonology",
-    "Asthma": "Pulmonology",
-}
 
 
 # ── 1. Load & merge ───────────────────────────────────────────────────────────
@@ -113,50 +64,6 @@ def load_and_merge() -> pd.DataFrame:
 
 # ── 2. Feature engineering ─────────────────────────────────────────────────────
 
-# Base severity for each disease
-DISEASE_BASE_RISK = {
-    # High Risk
-    "Myocardial Infarction": "High",
-    "Heart Failure": "High",
-    "Stroke": "High",
-    "Pneumonia": "High",
-    "Leukemia": "High",
-    "Lung Cancer": "High",
-    "Lymphoma": "High",
-    "Clotting Disorder": "High",
-    # Medium Risk
-    "Hypertension": "Medium",
-    "Coronary Artery Disease": "Medium",
-    "Arrhythmia": "Medium",
-    "Diabetes": "Medium",
-    "Hyperthyroidism": "Medium",
-    "Hypothyroidism": "Medium",
-    "Multiple Sclerosis": "Medium",
-    "Parkinson's Disease": "Medium",
-    "Epilepsy": "Medium",
-    "COPD": "Medium",
-    "Asthma": "Medium",
-    "Tuberculosis": "Medium",
-    "Anemia": "Medium",
-    "Infection": "Medium",
-    "Inflammation": "Medium",
-    "Obesity": "Medium",
-    "Eating Disorder": "Medium",
-    "Malnutrition": "Medium",
-    # Low Risk
-    "Psoriasis": "Low",
-    "Acne": "Low",
-    "Skin Infection": "Low",
-    "Eczema": "Low",
-    "Otitis Media": "Low",
-    "Sinusitis": "Low",
-    "Tonsillitis": "Low",
-    "Hearing Loss": "Low",
-    "Migraine": "Low",
-    "Vitamin Deficiency": "Low",
-    "PCOS": "Low",
-}
-
 def parse_blood_pressure(bp_series: pd.Series) -> pd.DataFrame:
     """Split '149/86' → BP_Systolic=149, BP_Diastolic=86."""
     split = bp_series.str.split("/", expand=True).astype(float)
@@ -173,15 +80,24 @@ def derive_normal_abnormal(df: pd.DataFrame) -> pd.Series:
       - Heart Rate > 100   or < 60
       - Temperature > 100.4 or < 96.0
     """
+    """
+    Derive Normal/Abnormal from vital-sign thresholds.
+    Abnormal if ANY of:
+      - Systolic BP outside normal range
+      - Diastolic BP outside normal range
+      - Heart Rate outside normal range
+      - Temperature outside normal range
+    """
+    th = config["thresholds"]
     abnormal = (
-        (df["BP_Systolic"] >= 140)
-        | (df["BP_Systolic"] <= 90)
-        | (df["BP_Diastolic"] >= 90)
-        | (df["BP_Diastolic"] <= 60)
-        | (df["Heart Rate"] > 100)
-        | (df["Heart Rate"] < 60)
-        | (df["Temperature"] > 100.4)
-        | (df["Temperature"] < 96.0)
+        (df["BP_Systolic"] >= th["bp_systolic"]["normal_max"])
+        | (df["BP_Systolic"] <= th["bp_systolic"]["normal_min"])
+        | (df["BP_Diastolic"] >= th["bp_diastolic"]["normal_max"])
+        | (df["BP_Diastolic"] <= th["bp_diastolic"]["normal_min"])
+        | (df["Heart Rate"] > th["heart_rate"]["normal_max"])
+        | (df["Heart Rate"] < th["heart_rate"]["normal_min"])
+        | (df["Temperature"] > th["temperature"]["normal_max"])
+        | (df["Temperature"] < th["temperature"]["normal_min"])
     )
     return abnormal.map({True: "Abnormal", False: "Normal"})
 
@@ -200,14 +116,15 @@ def derive_risk_level(df: pd.DataFrame) -> pd.Series:
        → Bump Low to Medium, Medium to High.
     """
     # 1. Base risk
-    base_risk = df["Disease"].map(DISEASE_BASE_RISK).fillna("Medium")
+    base_risk = df["Disease"].map(config["disease_base_risk"]).fillna("Medium")
     
     # 2. Identify critical vitals
+    th = config["thresholds"]
     critical_vitals = (
-        (df["BP_Systolic"] > 180) | (df["BP_Systolic"] < 80) |
-        (df["BP_Diastolic"] > 110) | (df["BP_Diastolic"] < 50) |
-        (df["Heart Rate"] > 120) | (df["Heart Rate"] < 50) |
-        (df["Temperature"] > 103) | (df["Temperature"] < 95)
+        (df["BP_Systolic"] > th["bp_systolic"]["critical_max"]) | (df["BP_Systolic"] < th["bp_systolic"]["critical_min"]) |
+        (df["BP_Diastolic"] > th["bp_diastolic"]["critical_max"]) | (df["BP_Diastolic"] < th["bp_diastolic"]["critical_min"]) |
+        (df["Heart Rate"] > th["heart_rate"]["critical_max"]) | (df["Heart Rate"] < th["heart_rate"]["critical_min"]) |
+        (df["Temperature"] > th["temperature"]["critical_max"]) | (df["Temperature"] < th["temperature"]["critical_min"])
     )
     
     # 3. Apply escalation
@@ -260,14 +177,15 @@ def build_preprocessor() -> ColumnTransformer:
 
 
 def build_model():
+    params = config["model_params"]
     return MultiOutputClassifier(
         RandomForestClassifier(
-            n_estimators=200,
-            max_depth=30,
-            min_samples_split=5,
-            n_jobs=-1,
-            random_state=42,
-            class_weight="balanced",
+            n_estimators=params["n_estimators"],
+            max_depth=params["max_depth"],
+            min_samples_split=params["min_samples_split"],
+            n_jobs=params["n_jobs"],
+            random_state=params["random_state"],
+            class_weight=params["class_weight"],
         )
     )
 
@@ -360,7 +278,7 @@ def main():
     joblib.dump(model, os.path.join(MODEL_DIR, "triage_model.joblib"))
     joblib.dump(preprocessor, os.path.join(MODEL_DIR, "preprocessor.joblib"))
     joblib.dump(label_encoders, os.path.join(MODEL_DIR, "label_encoders.joblib"))
-    joblib.dump(SPECIALTY_MAP, os.path.join(MODEL_DIR, "specialty_map.joblib"))
+    joblib.dump(config["specialty_map"], os.path.join(MODEL_DIR, "specialty_map.joblib"))
 
     with open(os.path.join(MODEL_DIR, "metrics.json"), "w") as f:
         json.dump(metrics, f, indent=2)
