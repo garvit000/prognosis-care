@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import PortalBackButton from '../components/PortalBackButton';
 
 function SignupPage() {
   const { currentUser, signup, getRoleHomeRoute } = useAuth();
@@ -61,7 +60,6 @@ function SignupPage() {
 
         <section className="auth-form-wrap animate-fadeIn">
           <div className="auth-glass-card">
-            <PortalBackButton fallbackPath="/auth" />
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-med-600">Patient Signup</p>
             <h2 className="mt-1 text-3xl font-bold text-slate-900">Create account</h2>
             <p className="mt-2 text-sm text-slate-600">Start your healthcare journey in under a minute.</p>

@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import PortalBackButton from '../components/PortalBackButton';
 
 function SuperAdminLoginPage() {
   const { currentUser, superAdminLogin, getRoleHomeRoute } = useAuth();
@@ -48,7 +47,6 @@ function SuperAdminLoginPage() {
 
         <section className="auth-form-wrap animate-fadeIn">
           <div className="auth-glass-card">
-            <PortalBackButton fallbackPath="/auth" />
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-med-600">Super Admin Login</p>
             <h2 className="mt-1 text-3xl font-bold text-slate-900">Sign in securely</h2>
             <p className="mt-2 text-sm text-slate-600">Use your organization-level credentials to continue.</p>

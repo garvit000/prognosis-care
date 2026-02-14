@@ -1,26 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import PortalBackButton from '../components/PortalBackButton';
-
-const roleOptions = [
-  { value: 'patient', label: 'Patient' },
-  { value: 'hospital-admin', label: 'Hospital Admin' },
-  { value: 'super-admin', label: 'Super Admin' },
-];
 
 function LoginPage() {
-  const { currentUser, login, hospitalAdminLogin, superAdminLogin, forgotPassword, getRoleHomeRoute } = useAuth();
+  const { currentUser, login, forgotPassword, getRoleHomeRoute } = useAuth();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
 
-  const initialRole = searchParams.get('role');
-  const safeInitialRole = roleOptions.some((role) => role.value === initialRole) ? initialRole : 'patient';
-  const isAdminRoleLocked = safeInitialRole === 'hospital-admin' || safeInitialRole === 'super-admin';
-
-  // Form state shared by all role login modes.
   const [form, setForm] = useState({
-    role: safeInitialRole,
     email: '',
     password: '',
     rememberMe: true,
@@ -29,12 +15,6 @@ function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [toast, setToast] = useState({ type: '', message: '' });
-
-  const roleHint = useMemo(() => {
-    if (form.role === 'super-admin') return 'Secure platform owner access.';
-    if (form.role === 'hospital-admin') return 'Access is enabled after super admin approval.';
-    return 'Sign in to continue your healthcare journey.';
-  }, [form.role]);
 
   useEffect(() => {
     const storedEmail = localStorage.getItem('pc_remembered_email');
@@ -71,13 +51,7 @@ function LoginPage() {
 
     setLoading(true);
     try {
-      if (form.role === 'super-admin') {
-        await superAdminLogin(form.email, form.password);
-      } else if (form.role === 'hospital-admin') {
-        await hospitalAdminLogin(form.email, form.password);
-      } else {
-        await login(form.email, form.password);
-      }
+      await login(form.email, form.password);
 
       if (form.rememberMe) {
         localStorage.setItem('pc_remembered_email', form.email);
@@ -123,7 +97,6 @@ function LoginPage() {
 
         <section className="auth-form-wrap animate-fadeIn">
           <div className="auth-glass-card">
-            <PortalBackButton fallbackPath="/auth" />
             {toast.message ? (
               <div
                 className={`mb-4 rounded-xl p-3 text-sm ${
@@ -136,30 +109,9 @@ function LoginPage() {
 
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-med-600">Login</p>
             <h2 className="mt-1 text-3xl font-bold text-slate-900">Welcome back</h2>
-            <p className="mt-2 text-sm text-slate-600">{roleHint}</p>
+            <p className="mt-2 text-sm text-slate-600">Sign in to continue your healthcare journey.</p>
 
             <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
-              {isAdminRoleLocked ? (
-                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700">
-                  Role: {form.role === 'hospital-admin' ? 'Hospital Admin' : 'Super Admin'}
-                </div>
-              ) : (
-                <div className="floating-field">
-                  <select
-                    className="floating-input"
-                    value={form.role}
-                    onChange={(event) => setForm((prev) => ({ ...prev, role: event.target.value }))}
-                  >
-                    {roleOptions.map((role) => (
-                      <option key={role.value} value={role.value}>
-                        {role.label}
-                      </option>
-                    ))}
-                  </select>
-                  <span className="floating-label">Role</span>
-                </div>
-              )}
-
               <div className="floating-field">
                 <input
                   className="floating-input"

@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import PortalBackButton from '../components/PortalBackButton';
 import { ALLOWED_HOSPITALS } from '../services/adminStore';
 
 const acceptedMimeTypes = ['application/pdf', 'image/jpeg', 'image/png'];
@@ -159,7 +158,6 @@ function HospitalSignupPage() {
 
         <section className="auth-form-wrap animate-fadeIn">
           <div className="auth-glass-card">
-            <PortalBackButton fallbackPath="/auth" />
             {toast.message ? (
               <div
                 className={`mb-4 rounded-xl p-3 text-sm ${

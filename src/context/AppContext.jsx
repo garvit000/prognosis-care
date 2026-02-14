@@ -48,6 +48,22 @@ function getStoredList(key) {
   }
 }
 
+function getStoredValue(key) {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function setStoredValue(key, value) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // no-op when storage access is blocked
+  }
+}
+
 function readFileAsDataURL(file) {
   return new Promise((resolve) => {
     if (!file) {
@@ -140,13 +156,13 @@ const storedAppointments = getStoredList(APPOINTMENTS_KEY);
 const storedMedicalRecords = getStoredList(MEDICAL_RECORDS_KEY);
 const storedDoctors = getStoredList(DOCTORS_KEY);
 const storedDepartments = getStoredList(DEPARTMENTS_KEY);
-const storedDoctorsDataVersion = localStorage.getItem(DOCTORS_DATA_VERSION_KEY);
+const storedDoctorsDataVersion = getStoredValue(DOCTORS_DATA_VERSION_KEY);
 const shouldRefreshDoctorSeed = storedDoctorsDataVersion !== DOCTORS_DATA_VERSION;
 
 if (shouldRefreshDoctorSeed) {
-  localStorage.setItem(DOCTORS_KEY, JSON.stringify(baseDoctors));
-  localStorage.setItem(DEPARTMENTS_KEY, JSON.stringify(baseDepartments));
-  localStorage.setItem(DOCTORS_DATA_VERSION_KEY, DOCTORS_DATA_VERSION);
+  setStoredValue(DOCTORS_KEY, JSON.stringify(baseDoctors));
+  setStoredValue(DEPARTMENTS_KEY, JSON.stringify(baseDepartments));
+  setStoredValue(DOCTORS_DATA_VERSION_KEY, DOCTORS_DATA_VERSION);
 }
 
 const initialState = {

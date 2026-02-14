@@ -1,4 +1,5 @@
-import { NavLink, Navigate, Route, Routes } from 'react-router-dom';
+import { NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import HomePage from './pages/HomePage';
 import LandingPage from './pages/LandingPage';
 import DashboardPage from './pages/DashboardPage';
 import AppointmentsPage from './pages/AppointmentsPage';
@@ -24,6 +25,7 @@ import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
 import NotificationToast from './components/NotificationToast';
 import HospitalSelectionModal from './components/HospitalSelectionModal';
+import PortalBackButton from './components/PortalBackButton';
 import ProtectedRoute from './components/ProtectedRoute';
 import { useAuth } from './context/AuthContext';
 import { useApp } from './context/AppContext';
@@ -46,6 +48,7 @@ const superAdminNavItems = [
 ];
 
 function App() {
+  const location = useLocation();
   const { currentUser, logout, getRoleHomeRoute, completeHospitalSelection } = useAuth();
   const { hospitals, state, setPatientSelectedHospital } = useApp();
 
@@ -64,8 +67,10 @@ function App() {
         ? hospitalNavItems
         : patientNavItems;
 
+  const showGlobalBackButton = location.pathname !== '/auth' && location.pathname !== '/';
+
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
+    <div className="min-h-screen bg-red-50 text-slate-900">
       {currentUser ? (
         <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
           <div className="page-shell flex flex-wrap items-center justify-between gap-3 py-4">
@@ -97,6 +102,12 @@ function App() {
         </header>
       ) : null}
 
+      {showGlobalBackButton ? (
+        <div className="page-shell pt-4">
+          <PortalBackButton fallbackPath="/" />
+        </div>
+      ) : null}
+
       <main className="animate-fadeIn">
         <Routes>
           <Route path="/auth" element={<AuthOptionsPage />} />
@@ -111,7 +122,7 @@ function App() {
               currentUser ? (
                 <Navigate to={getRoleHomeRoute(currentUser?.role)} replace />
               ) : (
-                <Navigate to="/auth" replace />
+                <HomePage />
               )
             }
           />
