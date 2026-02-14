@@ -6,6 +6,10 @@ function DoctorProfilePage() {
   const { state } = useApp();
   const selectedHospitalId = state.patient.selectedHospitalId || state.selectedHospital?.id;
   const doctor = state.doctors.find((item) => item.id === id);
+  const fallbackImage =
+    doctor?.gender === 'Female'
+      ? 'https://randomuser.me/api/portraits/women/44.jpg'
+      : 'https://randomuser.me/api/portraits/men/44.jpg';
 
   if (!doctor || (selectedHospitalId && doctor.hospitalId !== selectedHospitalId)) {
     return (
@@ -24,7 +28,15 @@ function DoctorProfilePage() {
     <div className="page-shell space-y-4">
       <section className="card">
         <div className="flex flex-wrap items-start gap-4">
-          <img src={doctor.profileImage} alt={doctor.fullName} className="h-36 w-36 rounded-2xl object-cover" />
+          <img
+            src={doctor.profileImage}
+            alt={doctor.fullName}
+            className="h-36 w-36 rounded-2xl object-cover"
+            onError={(event) => {
+              event.currentTarget.onerror = null;
+              event.currentTarget.src = fallbackImage;
+            }}
+          />
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-med-600">Doctor Profile</p>
             <h2 className="text-2xl font-bold">{doctor.fullName}</h2>

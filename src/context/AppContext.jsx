@@ -13,6 +13,8 @@ const APPOINTMENTS_KEY = 'pc_appointments';
 const MEDICAL_RECORDS_KEY = 'pc_medical_records';
 const DOCTORS_KEY = 'pc_doctors';
 const DEPARTMENTS_KEY = 'pc_departments';
+const DOCTORS_DATA_VERSION_KEY = 'pc_doctors_data_version';
+const DOCTORS_DATA_VERSION = '2026-02-14-image-refresh-v1';
 
 const emptyPatientProfile = {
   id: 'PAT-1001',
@@ -138,6 +140,14 @@ const storedAppointments = getStoredList(APPOINTMENTS_KEY);
 const storedMedicalRecords = getStoredList(MEDICAL_RECORDS_KEY);
 const storedDoctors = getStoredList(DOCTORS_KEY);
 const storedDepartments = getStoredList(DEPARTMENTS_KEY);
+const storedDoctorsDataVersion = localStorage.getItem(DOCTORS_DATA_VERSION_KEY);
+const shouldRefreshDoctorSeed = storedDoctorsDataVersion !== DOCTORS_DATA_VERSION;
+
+if (shouldRefreshDoctorSeed) {
+  localStorage.setItem(DOCTORS_KEY, JSON.stringify(baseDoctors));
+  localStorage.setItem(DEPARTMENTS_KEY, JSON.stringify(baseDepartments));
+  localStorage.setItem(DOCTORS_DATA_VERSION_KEY, DOCTORS_DATA_VERSION);
+}
 
 const initialState = {
   patient: storedProfile ? { ...emptyPatientProfile, ...storedProfile } : emptyPatientProfile,
@@ -145,8 +155,8 @@ const initialState = {
   patientSymptoms: '',
   recommendedTests: [],
   recommendationSummary: '',
-  doctors: storedDoctors.length ? storedDoctors : baseDoctors,
-  departments: storedDepartments.length ? storedDepartments : baseDepartments,
+  doctors: shouldRefreshDoctorSeed ? baseDoctors : storedDoctors.length ? storedDoctors : baseDoctors,
+  departments: shouldRefreshDoctorSeed ? baseDepartments : storedDepartments.length ? storedDepartments : baseDepartments,
   selectedHospital: hospitals.find((hospital) => hospital.id === storedProfile?.selectedHospitalId) || hospitals[0],
   draftBooking: null,
   latestBooking: null,

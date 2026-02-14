@@ -17,14 +17,29 @@ export const contractDepartments = [
   'Cardiology',
 ];
 
-const stockProfileImages = [
-  'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=600&q=80',
-  'https://images.unsplash.com/photo-1612531386530-97286d97c2d2?auto=format&fit=crop&w=600&q=80',
-  'https://images.unsplash.com/photo-1594824476967-48c8b964273f?auto=format&fit=crop&w=600&q=80',
-  'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=600&q=80',
-  'https://images.unsplash.com/photo-1585435557343-3b092031a831?auto=format&fit=crop&w=600&q=80',
-  'https://images.unsplash.com/photo-1651008376811-b90baee60c1f?auto=format&fit=crop&w=600&q=80',
-];
+const femaleFirstNames = new Set([
+  'Kavya', 'Ritu', 'Anjali', 'Neha', 'Rohini', 'Meera', 'Shreya', 'Anitha', 'Divya', 'Sneha',
+  'Riya', 'Pooja', 'Nisha', 'Priya', 'Deepika', 'Reena', 'Farah', 'Kavita', 'Ananya', 'Lakshmi',
+  'Sana', 'Nandini', 'Sonia', 'Aditi', 'Meenakshi', 'Anita',
+]);
+
+function extractFirstName(fullName) {
+  return fullName.replace(/^Dr\.\s*/i, '').trim().split(/\s+/)[0] || '';
+}
+
+function inferGenderFromName(fullName) {
+  const firstName = extractFirstName(fullName);
+  return femaleFirstNames.has(firstName) ? 'Female' : 'Male';
+}
+
+function createUniqueProfileImage(gender, hospitalIdx, deptIdx, doctorIdx) {
+  const uniqueNumber = hospitalIdx * 100 + deptIdx * 10 + doctorIdx + 101;
+  const randomUserIndex = uniqueNumber % 100;
+  if (gender === 'Female') {
+    return `https://randomuser.me/api/portraits/women/${randomUserIndex}.jpg`;
+  }
+  return `https://randomuser.me/api/portraits/men/${randomUserIndex}.jpg`;
+}
 
 const departmentExpansionPool = {
   Pulmonology: [
@@ -597,12 +612,13 @@ export const contractDoctors = Object.entries(sourceDoctorsFullRoster).flatMap((
   return Object.entries(departments).flatMap(([department, entries], deptIdx) =>
     entries.map((entry, doctorIdx) => {
       const [fullName, experienceYears, degree, focus, slotText, languages, workingDaysText] = entry;
+      const inferredGender = inferGenderFromName(fullName);
       const id = `${hospital.id}-${department.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${doctorIdx + 1}`;
 
       return {
         id,
         fullName,
-        gender: doctorIdx % 2 === 0 ? 'Male' : 'Female',
+        gender: inferredGender,
         department,
         specialization: focus,
         experienceYears,
@@ -613,7 +629,7 @@ export const contractDoctors = Object.entries(sourceDoctorsFullRoster).flatMap((
         ],
         consultationFee: 900 + deptIdx * 80,
         languages,
-        profileImage: stockProfileImages[(hospitalIdx + deptIdx + doctorIdx) % stockProfileImages.length],
+        profileImage: createUniqueProfileImage(inferredGender, hospitalIdx, deptIdx, doctorIdx),
         availabilityStatus: 'Available',
         weeklyAvailability: createWeeklySchedule(slotText, workingDaysText),
         availableTimeSlots: slotArrayFromRange(slotText),
