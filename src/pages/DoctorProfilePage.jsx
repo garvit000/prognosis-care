@@ -1,11 +1,13 @@
 import { Link, useParams } from 'react-router-dom';
-import { getDoctorById } from '../services/mockDoctorsData';
+import { useApp } from '../context/AppContext';
 
 function DoctorProfilePage() {
   const { id } = useParams();
-  const doctor = getDoctorById(id);
+  const { state } = useApp();
+  const selectedHospitalId = state.patient.selectedHospitalId || state.selectedHospital?.id;
+  const doctor = state.doctors.find((item) => item.id === id);
 
-  if (!doctor) {
+  if (!doctor || (selectedHospitalId && doctor.hospitalId !== selectedHospitalId)) {
     return (
       <div className="page-shell">
         <section className="card">

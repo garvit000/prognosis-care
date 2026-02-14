@@ -1,67 +1,226 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import {
-  createUserWithEmailAndPassword,
-  onAuthStateChanged,
-  signInWithEmailAndPassword,
-  signOut,
-} from 'firebase/auth';
+import { createUserWithEmailAndPassword, sendPasswordResetEmail, signInWithEmailAndPassword } from 'firebase/auth';
 import { auth, firebaseConfigError, isFirebaseConfigured } from '../services/firebase';
+import {
+  getHospitalAccounts,
+  getHospitalRequests,
+  submitHospitalSignup,
+} from '../services/adminStore';
+import { secureSuperAdminCredentials } from '../services/secureAuthConfig';
 
 const AuthContext = createContext(null);
+const AUTH_SESSION_KEY = 'pc_auth_session';
+
+function createMockJwtToken(payload) {
+  const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+  const body = btoa(JSON.stringify({ ...payload, iat: Date.now() }));
+  const signature = btoa('mock-signature');
+  return `${header}.${body}.${signature}`;
+}
+
+function getRoleHomeRoute(role) {
+  if (role === 'super-admin') return '/super-admin-dashboard';
+  if (role === 'hospital-admin') return '/doctor-dashboard';
+  return '/welcome';
+}
+
+function getStoredSession() {
+  try {
+    const raw = localStorage.getItem(AUTH_SESSION_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveSession(session) {
+  localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(session));
+}
+
+function clearSession() {
+  localStorage.removeItem(AUTH_SESSION_KEY);
+}
+
+function updateSession(updater) {
+  const current = getStoredSession();
+  if (!current) return null;
+  const next = updater(current);
+  saveSession(next);
+  return next;
+}
+
+function validatePassword(password) {
+  return password.length >= 8 && /[A-Z]/.test(password) && /[0-9]/.test(password) && /[^A-Za-z0-9]/.test(password);
+}
 
 export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
 
   useEffect(() => {
-    if (!isFirebaseConfigured || !auth) {
-      const localSession = localStorage.getItem('pc_auth_user');
-      if (localSession) {
-        try {
-          setCurrentUser(JSON.parse(localSession));
-        } catch {
-          localStorage.removeItem('pc_auth_user');
-        }
-      }
-      setAuthLoading(false);
-      return () => {};
+    const session = getStoredSession();
+    if (session) {
+      setCurrentUser(session);
     }
-
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setCurrentUser(user);
-      setAuthLoading(false);
-    });
-
-    return unsubscribe;
+    setAuthLoading(false);
   }, []);
 
   const signup = async (email, password) => {
-    if (!isFirebaseConfigured || !auth) {
-      const mockUser = { uid: `mock-${Date.now()}`, email };
-      localStorage.setItem('pc_auth_user', JSON.stringify(mockUser));
-      setCurrentUser(mockUser);
-      return { user: mockUser };
+    if (!validatePassword(password)) {
+      throw new Error('Password must be at least 8 chars and include uppercase, number, and special character.');
     }
-    return createUserWithEmailAndPassword(auth, email, password);
+
+    let userData;
+    if (!isFirebaseConfigured || !auth) {
+      userData = { uid: `patient-${Date.now()}`, email };
+    } else {
+      const response = await createUserWithEmailAndPassword(auth, email, password);
+      userData = response.user;
+    }
+
+    const session = {
+      id: userData.uid,
+      email: userData.email,
+      name: userData.email?.split('@')[0] || 'Patient',
+      role: 'patient',
+      needsHospitalSelection: true,
+      token: createMockJwtToken({ role: 'patient', email: userData.email }),
+      loginAt: new Date().toISOString(),
+    };
+
+    saveSession(session);
+    setCurrentUser(session);
+    return { user: session };
   };
 
   const login = async (email, password) => {
+    let userData;
     if (!isFirebaseConfigured || !auth) {
-      const mockUser = { uid: `mock-${Date.now()}`, email };
-      localStorage.setItem('pc_auth_user', JSON.stringify(mockUser));
-      setCurrentUser(mockUser);
-      return { user: mockUser };
+      userData = { uid: `patient-${Date.now()}`, email };
+    } else {
+      const response = await signInWithEmailAndPassword(auth, email, password);
+      userData = response.user;
     }
-    return signInWithEmailAndPassword(auth, email, password);
+
+    const session = {
+      id: userData.uid,
+      email: userData.email,
+      name: userData.email?.split('@')[0] || 'Patient',
+      role: 'patient',
+      needsHospitalSelection: true,
+      token: createMockJwtToken({ role: 'patient', email: userData.email }),
+      loginAt: new Date().toISOString(),
+    };
+
+    saveSession(session);
+    setCurrentUser(session);
+    return { user: session };
+  };
+
+  const superAdminLogin = async (email, password) => {
+    if (email !== secureSuperAdminCredentials.email || password !== secureSuperAdminCredentials.password) {
+      throw new Error('Invalid credentials');
+    }
+
+    const session = {
+      id: 'super-admin-1',
+      email,
+      name: secureSuperAdminCredentials.name,
+      role: 'super-admin',
+      token: createMockJwtToken({ role: 'super-admin', email }),
+      loginAt: new Date().toISOString(),
+    };
+
+    saveSession(session);
+    setCurrentUser(session);
+    return session;
+  };
+
+  const hospitalSignup = async (payload) => {
+    if (!validatePassword(payload.password)) {
+      return {
+        ok: false,
+        error: 'Password must be at least 8 chars and include uppercase, number, and special character.',
+      };
+    }
+
+    return submitHospitalSignup(payload);
+  };
+
+  const hospitalAdminLogin = async (email, password) => {
+    const normalizedEmail = email.trim().toLowerCase();
+
+    const account = getHospitalAccounts().find(
+      (item) => item.contactEmail?.trim().toLowerCase() === normalizedEmail
+    );
+    const request = getHospitalRequests().find(
+      (item) => item.contactEmail?.trim().toLowerCase() === normalizedEmail
+    );
+
+    if (!account) {
+      if (request?.status === 'Pending Approval') {
+        throw new Error('Your hospital account is pending super admin approval.');
+      }
+      if (request?.status === 'Rejected') {
+        throw new Error(`Hospital registration rejected. ${request.reviewNote || ''}`.trim());
+      }
+      if (request?.status === 'More Info Requested') {
+        throw new Error(`More information required. ${request.reviewNote || ''}`.trim());
+      }
+      throw new Error('Hospital account not found. Please complete hospital signup first.');
+    }
+
+    if (account.password !== password) {
+      throw new Error('Invalid email or password.');
+    }
+
+    if (account.status !== 'Active') {
+      throw new Error(`Account is ${account.status}. Please contact super admin.`);
+    }
+
+    const session = {
+      id: account.id,
+      email: account.contactEmail,
+      name: account.adminName,
+      role: 'hospital-admin',
+      hospitalId: account.id,
+      hospitalName: account.hospitalName,
+      token: createMockJwtToken({ role: 'hospital-admin', hospitalId: account.id, email }),
+      loginAt: new Date().toISOString(),
+    };
+
+    saveSession(session);
+    setCurrentUser(session);
+    return session;
   };
 
   const logout = async () => {
-    if (!isFirebaseConfigured || !auth) {
-      localStorage.removeItem('pc_auth_user');
-      setCurrentUser(null);
-      return;
+    clearSession();
+    setCurrentUser(null);
+  };
+
+  const completeHospitalSelection = () => {
+    const nextSession = updateSession((session) => ({
+      ...session,
+      needsHospitalSelection: false,
+    }));
+
+    if (nextSession) {
+      setCurrentUser(nextSession);
     }
-    await signOut(auth);
+  };
+
+  const forgotPassword = async (email) => {
+    if (!email) {
+      throw new Error('Please provide your email.');
+    }
+
+    if (!isFirebaseConfigured || !auth) {
+      return { ok: true };
+    }
+
+    await sendPasswordResetEmail(auth, email);
+    return { ok: true };
   };
 
   const value = useMemo(
@@ -72,7 +231,13 @@ export function AuthProvider({ children }) {
       firebaseConfigError,
       signup,
       login,
+      superAdminLogin,
+      hospitalSignup,
+      hospitalAdminLogin,
+      forgotPassword,
       logout,
+      completeHospitalSelection,
+      getRoleHomeRoute,
     }),
     [currentUser, authLoading]
   );

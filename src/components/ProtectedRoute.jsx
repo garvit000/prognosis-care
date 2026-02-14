@@ -1,7 +1,13 @@
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
-function ProtectedRoute({ children }) {
+function roleHome(role) {
+  if (role === 'super-admin') return '/super-admin-dashboard';
+  if (role === 'hospital-admin') return '/hospital-dashboard';
+  return '/dashboard';
+}
+
+function ProtectedRoute({ children, allowedRoles, redirectPath = '/auth' }) {
   const { currentUser, authLoading } = useAuth();
 
   if (authLoading) {
@@ -13,7 +19,11 @@ function ProtectedRoute({ children }) {
   }
 
   if (!currentUser) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to={redirectPath} replace />;
+  }
+
+  if (allowedRoles?.length && !allowedRoles.includes(currentUser.role)) {
+    return <Navigate to={roleHome(currentUser.role)} replace />;
   }
 
   return children;

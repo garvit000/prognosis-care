@@ -1,4 +1,5 @@
 import { createContext, useContext, useMemo, useState } from 'react';
+import { departmentList as baseDepartments, doctors as baseDoctors } from '../services/mockDoctorsData';
 import {
   createBooking,
   fetchAiRecommendations,
@@ -10,10 +11,13 @@ const AppContext = createContext(null);
 const PATIENT_PROFILE_KEY = 'pc_patient_profile';
 const APPOINTMENTS_KEY = 'pc_appointments';
 const MEDICAL_RECORDS_KEY = 'pc_medical_records';
+const DOCTORS_KEY = 'pc_doctors';
+const DEPARTMENTS_KEY = 'pc_departments';
 
 const emptyPatientProfile = {
   id: 'PAT-1001',
   name: '',
+  selectedHospitalId: '',
   dob: '',
   bloodGroup: '',
   gender: '',
@@ -70,26 +74,40 @@ function inferRiskLevelFromBp(bp) {
 
 const hospitals = [
   {
+    id: 'hosp-2',
+    name: 'Fortis Hospital',
+    locations: ['Main Tower', 'Diagnostics Wing'],
+    address: '88 Health Avenue, Metro City',
+    description: 'Contracted tertiary partner hospital with advanced specialty care and diagnostics.',
+    specialties: ['Pulmonology', 'Endocrinology', 'Oncology', 'Cardiology'],
+    specialistUnits: [
+      'Pulmonary Critical Care Unit',
+      'Advanced Cardiac Services',
+      'Comprehensive Oncology Team',
+      'Neurology & Stroke Unit',
+    ],
+    facilities: [
+      '24/7 Emergency Response',
+      'Advanced Imaging Suite',
+      'Integrated ICU Support',
+      'Multispeciality OPD',
+    ],
+    accreditation: 'NABH Accredited',
+    rating: 4.8,
+    emergencySupport: '24/7 Emergency & ICU',
+    insuranceAvailable: true,
+    serviceFee: 199,
+    taxRate: 0.12,
+  },
+  {
     id: 'hosp-1',
     name: 'CityCare Multi-Speciality Hospital',
     locations: ['Downtown Center', 'North Campus', 'East Wing Diagnostics'],
     address: '12 Heartline Ave, MedCity',
-    description:
-      'A tertiary-care center known for rapid cardiac diagnostics, integrated emergency response, and patient-centric preventive care programs.',
-    specialties: ['Cardiology', 'Internal Medicine', 'Radiology', 'Pathology'],
-    specialistUnits: [
-      'Cardiac Surgery Specialists',
-      'Interventional Cardiologists',
-      'Neurology Consultants',
-      'Orthopedic Surgery Team',
-    ],
-    facilities: [
-      '3T MRI & CT Imaging Suite',
-      'Modular Operation Theatres',
-      '24/7 Cath Lab',
-      'Dialysis & Critical Care ICU',
-      'Advanced Pathology & Blood Bank',
-    ],
+    description: 'Contracted multi-speciality center with integrated diagnostics and specialist OPDs.',
+    specialties: ['General Medicine', 'Cardiology', 'Neurology', 'Pathology'],
+    specialistUnits: ['Cardiac Unit', 'Neuro Unit', 'Comprehensive Diagnostics'],
+    facilities: ['MRI & CT', 'Operation Theatres', 'Cath Lab', 'Advanced Lab'],
     accreditation: 'NABH Accredited',
     rating: 4.7,
     emergencySupport: '24/7 Emergency & ICU',
@@ -97,11 +115,29 @@ const hospitals = [
     serviceFee: 199,
     taxRate: 0.12,
   },
+  {
+    id: 'hosp-3',
+    name: 'Max Hospital',
+    locations: ['Central Campus', 'Specialty Block'],
+    address: '44 Clinical Street, Health District',
+    description: 'Contracted high-volume specialty hospital for critical and chronic care pathways.',
+    specialties: ['Oncology', 'Pulmonology', 'Endocrinology', 'ENT'],
+    specialistUnits: ['Oncology Daycare', 'Pulmonary Rehab', 'Cardiac Risk Clinic'],
+    facilities: ['Advanced OT', 'Daycare Suites', 'Comprehensive Lab Services'],
+    accreditation: 'NABH Accredited',
+    rating: 4.6,
+    emergencySupport: '24/7 Emergency',
+    insuranceAvailable: true,
+    serviceFee: 219,
+    taxRate: 0.12,
+  },
 ];
 
 const storedProfile = getStoredPatientProfile();
 const storedAppointments = getStoredList(APPOINTMENTS_KEY);
 const storedMedicalRecords = getStoredList(MEDICAL_RECORDS_KEY);
+const storedDoctors = getStoredList(DOCTORS_KEY);
+const storedDepartments = getStoredList(DEPARTMENTS_KEY);
 
 const initialState = {
   patient: storedProfile ? { ...emptyPatientProfile, ...storedProfile } : emptyPatientProfile,
@@ -109,7 +145,9 @@ const initialState = {
   patientSymptoms: '',
   recommendedTests: [],
   recommendationSummary: '',
-  selectedHospital: hospitals[0],
+  doctors: storedDoctors.length ? storedDoctors : baseDoctors,
+  departments: storedDepartments.length ? storedDepartments : baseDepartments,
+  selectedHospital: hospitals.find((hospital) => hospital.id === storedProfile?.selectedHospitalId) || hospitals[0],
   draftBooking: null,
   latestBooking: null,
   appointments: storedAppointments,
@@ -177,10 +215,12 @@ export function AppProvider({ children }) {
 
   const updatePatientProfile = (profileInput) => {
     const riskLevel = inferRiskLevelFromBp(profileInput.bp);
+    const selectedHospital = hospitals.find((hospital) => hospital.id === profileInput.selectedHospitalId) || hospitals[0];
     const nextPatient = {
       ...state.patient,
       ...profileInput,
       riskLevel,
+      selectedHospitalId: selectedHospital.id,
     };
 
     localStorage.setItem(PATIENT_PROFILE_KEY, JSON.stringify(nextPatient));
@@ -188,8 +228,28 @@ export function AppProvider({ children }) {
     setState((prev) => ({
       ...prev,
       patient: nextPatient,
+      selectedHospital,
       profileCompleted: true,
     }));
+  };
+
+  const setPatientSelectedHospital = (hospitalId) => {
+    const selectedHospital = hospitals.find((hospital) => hospital.id === hospitalId) || hospitals[0];
+
+    setState((prev) => {
+      const nextPatient = {
+        ...prev.patient,
+        selectedHospitalId: selectedHospital.id,
+      };
+
+      localStorage.setItem(PATIENT_PROFILE_KEY, JSON.stringify(nextPatient));
+
+      return {
+        ...prev,
+        patient: nextPatient,
+        selectedHospital,
+      };
+    });
   };
 
   const pushNotification = (message) => {
@@ -197,6 +257,14 @@ export function AppProvider({ children }) {
       ...prev,
       notifications: [{ id: Date.now(), message }, ...prev.notifications].slice(0, 5),
     }));
+  };
+
+  const persistDoctors = (doctorsList) => {
+    localStorage.setItem(DOCTORS_KEY, JSON.stringify(doctorsList));
+  };
+
+  const persistDepartments = (departmentsList) => {
+    localStorage.setItem(DEPARTMENTS_KEY, JSON.stringify(departmentsList));
   };
 
   const persistAppointments = (appointments) => {
@@ -234,6 +302,112 @@ export function AppProvider({ children }) {
     return newRecord;
   };
 
+  const addDoctor = (doctorInput, hospitalId, hospitalName) => {
+    const doctor = {
+      id: `doctor-${Date.now().toString().slice(-8)}`,
+      fullName: doctorInput.fullName,
+      gender: doctorInput.gender,
+      department: doctorInput.department,
+      specialization: doctorInput.specialization,
+      experienceYears: Number(doctorInput.experienceYears),
+      educationShort: doctorInput.educationShort,
+      educationHistory: [
+        { degree: 'MBBS', institution: doctorInput.mbbsInstitution, year: doctorInput.mbbsYear },
+        { degree: doctorInput.advancedDegree, institution: doctorInput.advancedInstitution, year: doctorInput.advancedYear },
+      ],
+      consultationFee: Number(doctorInput.consultationFee),
+      languages: doctorInput.languages.split(',').map((item) => item.trim()).filter(Boolean),
+      profileImage: doctorInput.profileImage,
+      availabilityStatus: 'Available',
+      weeklyAvailability: doctorInput.weeklyAvailability,
+      availableTimeSlots: doctorInput.availableTimeSlots,
+      professionalBio: doctorInput.professionalBio,
+      workTimeline: [{ period: 'Current', role: `Consultant, ${hospitalName}` }],
+      hospitalAffiliation: hospitalName,
+      hospitalId,
+      certifications: ['Medical Council Registered'],
+      publications: ['Clinical profile available on request'],
+      patientReviews: [],
+    };
+
+    setState((prev) => {
+      const nextDoctors = [doctor, ...prev.doctors];
+      persistDoctors(nextDoctors);
+      return {
+        ...prev,
+        doctors: nextDoctors,
+      };
+    });
+
+    pushNotification(`Doctor ${doctor.fullName} added successfully.`);
+    return doctor;
+  };
+
+  const updateDoctor = (doctorId, patch) => {
+    setState((prev) => {
+      const nextDoctors = prev.doctors.map((doctor) => (doctor.id === doctorId ? { ...doctor, ...patch } : doctor));
+      persistDoctors(nextDoctors);
+      return {
+        ...prev,
+        doctors: nextDoctors,
+      };
+    });
+  };
+
+  const removeDoctor = (doctorId) => {
+    setState((prev) => {
+      const nextDoctors = prev.doctors.filter((doctor) => doctor.id !== doctorId);
+      persistDoctors(nextDoctors);
+      return {
+        ...prev,
+        doctors: nextDoctors,
+      };
+    });
+  };
+
+  const addDepartment = (departmentName) => {
+    const clean = departmentName.trim();
+    if (!clean) return;
+    setState((prev) => {
+      if (prev.departments.includes(clean)) return prev;
+      const nextDepartments = [...prev.departments, clean];
+      persistDepartments(nextDepartments);
+      return {
+        ...prev,
+        departments: nextDepartments,
+      };
+    });
+  };
+
+  const editDepartment = (oldName, newName) => {
+    const clean = newName.trim();
+    if (!clean) return;
+    setState((prev) => {
+      const nextDepartments = prev.departments.map((department) => (department === oldName ? clean : department));
+      const nextDoctors = prev.doctors.map((doctor) =>
+        doctor.department === oldName ? { ...doctor, department: clean } : doctor
+      );
+      persistDepartments(nextDepartments);
+      persistDoctors(nextDoctors);
+      return {
+        ...prev,
+        departments: nextDepartments,
+        doctors: nextDoctors,
+      };
+    });
+  };
+
+  const deleteDepartment = (departmentName) => {
+    setState((prev) => {
+      const nextDepartments = prev.departments.filter((department) => department !== departmentName);
+      persistDepartments(nextDepartments);
+      return {
+        ...prev,
+        departments: nextDepartments,
+      };
+    });
+  };
+
   const deleteMedicalRecord = (recordId) => {
     setState((prev) => {
       const nextRecords = prev.medicalRecords.filter((record) => record.id !== recordId);
@@ -253,6 +427,9 @@ export function AppProvider({ children }) {
 
     const appointment = {
       id: appointmentId,
+      patient_id: state.patient.id,
+      doctor_id: doctor.id,
+      hospital_id: doctor.hospitalId || 'hosp-1',
       doctorId: doctor.id,
       doctorName: doctor.fullName,
       department,
@@ -307,6 +484,20 @@ export function AppProvider({ children }) {
       };
     });
     pushNotification('Appointment cancelled.');
+  };
+
+  const updateAppointmentStatus = (appointmentId, status) => {
+    setState((prev) => {
+      const nextAppointments = prev.appointments.map((appointment) =>
+        appointment.id === appointmentId ? { ...appointment, status } : appointment
+      );
+      persistAppointments(nextAppointments);
+      return {
+        ...prev,
+        appointments: nextAppointments,
+      };
+    });
+    pushNotification(`Appointment marked as ${status}.`);
   };
 
   const loadRecommendations = async (symptomsText) => {
@@ -479,8 +670,16 @@ export function AppProvider({ children }) {
       loading,
       paymentError,
       updatePatientProfile,
+      setPatientSelectedHospital,
+      addDoctor,
+      updateDoctor,
+      removeDoctor,
+      addDepartment,
+      editDepartment,
+      deleteDepartment,
       addAppointment,
       cancelAppointment,
+      updateAppointmentStatus,
       addMedicalRecord,
       deleteMedicalRecord,
       pushNotification,

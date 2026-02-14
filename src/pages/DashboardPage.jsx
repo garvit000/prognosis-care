@@ -7,7 +7,7 @@ import DoctorAvailabilitySection from '../components/dashboard/DoctorAvailabilit
 import AIHealthInsightCard from '../components/dashboard/AIHealthInsightCard';
 import UpcomingEventsSection from '../components/dashboard/UpcomingEventsSection';
 import ReceptionChatWidget from '../components/dashboard/ReceptionChatWidget';
-import { doctorsAvailableToday, quickActions } from '../services/mockDashboardData';
+import { quickActions } from '../services/mockDashboardData';
 
 function getRiskScore(level) {
   if (level === 'high') return 82;
@@ -89,6 +89,7 @@ function buildUpcomingEvents(state) {
 
 function DashboardPage() {
   const { state } = useApp();
+  const selectedHospitalId = state.patient.selectedHospitalId || state.selectedHospital?.id;
   const patientRiskScore = getRiskScore(state.patient.riskLevel);
   const aiRiskScore = computeRiskFromTests(state.recommendedTests);
   const hasSymptomsData = Boolean(
@@ -109,6 +110,21 @@ function DashboardPage() {
   );
 
   const upcomingEvents = useMemo(() => buildUpcomingEvents(state), [state]);
+  const doctorsAvailableToday = useMemo(
+    () =>
+      state.doctors
+        .filter((doctor) => doctor.hospitalId === selectedHospitalId)
+        .slice(0, 8)
+        .map((doctor) => ({
+        id: doctor.id,
+        name: doctor.fullName,
+        department: doctor.department,
+        image: doctor.profileImage,
+        nextSlot: doctor.availableTimeSlots[0] || 'Fully booked',
+        status: doctor.availabilityStatus === 'Available' ? 'available' : 'booked',
+      })),
+    [selectedHospitalId, state.doctors]
+  );
 
   return (
     <div className="page-shell space-y-4 pb-24">

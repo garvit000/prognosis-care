@@ -1,10 +1,13 @@
 import { Link, useParams } from 'react-router-dom';
 import DoctorInfoCard from '../components/doctors/DoctorInfoCard';
-import { getDepartmentNameFromSlug, getDoctorsByDepartment } from '../services/mockDoctorsData';
+import { getDepartmentNameFromSlug } from '../services/mockDoctorsData';
+import { useApp } from '../context/AppContext';
 
 function DepartmentDoctorsPage() {
   const { departmentSlug } = useParams();
+  const { state } = useApp();
   const departmentName = getDepartmentNameFromSlug(departmentSlug);
+  const selectedHospitalId = state.patient.selectedHospitalId || state.selectedHospital?.id;
 
   if (!departmentName) {
     return (
@@ -19,7 +22,9 @@ function DepartmentDoctorsPage() {
     );
   }
 
-  const departmentDoctors = getDoctorsByDepartment(departmentName);
+  const departmentDoctors = state.doctors.filter(
+    (doctor) => doctor.department === departmentName && doctor.hospitalId === selectedHospitalId
+  );
 
   return (
     <div className="page-shell space-y-4">

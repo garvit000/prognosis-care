@@ -4,9 +4,10 @@ import { useApp } from '../context/AppContext';
 
 function LandingPage() {
   const navigate = useNavigate();
-  const { state, updatePatientProfile } = useApp();
+  const { state, hospitals, updatePatientProfile } = useApp();
   const [formData, setFormData] = useState({
     name: state.patient.name || '',
+    selectedHospitalId: state.patient.selectedHospitalId || hospitals[0]?.id || '',
     dob: state.patient.dob || '',
     bloodGroup: state.patient.bloodGroup || '',
     gender: state.patient.gender || '',
@@ -45,6 +46,22 @@ function LandingPage() {
               onChange={(e) => handleChange('name', e.target.value)}
               required
             />
+          </label>
+
+          <label className="text-sm text-slate-700 sm:col-span-2">
+            Select Contract Hospital
+            <select
+              className="input mt-1"
+              value={formData.selectedHospitalId}
+              onChange={(e) => handleChange('selectedHospitalId', e.target.value)}
+              required
+            >
+              {hospitals.map((hospital) => (
+                <option key={hospital.id} value={hospital.id}>
+                  {hospital.name}
+                </option>
+              ))}
+            </select>
           </label>
 
           <label className="text-sm text-slate-700">

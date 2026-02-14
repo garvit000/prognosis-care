@@ -13,24 +13,56 @@ import PaymentPage from './pages/PaymentPage';
 import BookingConfirmationPage from './pages/BookingConfirmationPage';
 import MedicalRecordsPage from './pages/MedicalRecordsPage';
 import AdminHospitalPanelPage from './pages/AdminHospitalPanelPage';
+import HospitalSignupPage from './pages/HospitalSignupPage';
+import HospitalLoginPage from './pages/HospitalLoginPage';
+import HospitalDashboardPage from './pages/HospitalDashboardPage';
+import SuperAdminLoginPage from './pages/SuperAdminLoginPage';
+import SuperAdminDashboardPage from './pages/SuperAdminDashboardPage';
+import AuthOptionsPage from './pages/AuthOptionsPage';
 import NotFoundPage from './pages/NotFoundPage';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
 import NotificationToast from './components/NotificationToast';
+import HospitalSelectionModal from './components/HospitalSelectionModal';
 import ProtectedRoute from './components/ProtectedRoute';
 import { useAuth } from './context/AuthContext';
+import { useApp } from './context/AppContext';
 
-const navItems = [
+const patientNavItems = [
   { to: '/dashboard', label: 'Dashboard' },
   { to: '/welcome', label: 'Welcome' },
   { to: '/my-appointments', label: 'My Appointments' },
   { to: '/triage', label: 'AI Assistant' },
   { to: '/medical-records', label: 'Medical Records' },
-  { to: '/admin/hospital', label: 'Hospital Panel' },
+];
+
+const hospitalNavItems = [
+  { to: '/doctor-dashboard', label: 'Doctor Admin Dashboard' },
+  { to: '/medical-records', label: 'Medical Records' },
+];
+
+const superAdminNavItems = [
+  { to: '/super-admin-dashboard', label: 'Super Dashboard' },
 ];
 
 function App() {
-  const { currentUser, logout } = useAuth();
+  const { currentUser, logout, getRoleHomeRoute, completeHospitalSelection } = useAuth();
+  const { hospitals, state, setPatientSelectedHospital } = useApp();
+
+  const showHospitalSelectionModal =
+    currentUser?.role === 'patient' && Boolean(currentUser?.needsHospitalSelection);
+
+  const handleHospitalConfirm = (hospitalId) => {
+    setPatientSelectedHospital(hospitalId);
+    completeHospitalSelection();
+  };
+
+  const navItems =
+    currentUser?.role === 'super-admin'
+      ? superAdminNavItems
+      : currentUser?.role === 'hospital-admin'
+        ? hospitalNavItems
+        : patientNavItems;
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
@@ -67,20 +99,26 @@ function App() {
 
       <main className="animate-fadeIn">
         <Routes>
+          <Route path="/auth" element={<AuthOptionsPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
+          <Route path="/super-admin-login" element={<SuperAdminLoginPage />} />
+          <Route path="/hospital-signup" element={<HospitalSignupPage />} />
+          <Route path="/hospital-login" element={<HospitalLoginPage />} />
           <Route
             path="/"
             element={
-              <ProtectedRoute>
-                <Navigate to="/welcome" replace />
-              </ProtectedRoute>
+              currentUser ? (
+                <Navigate to={getRoleHomeRoute(currentUser?.role)} replace />
+              ) : (
+                <Navigate to="/auth" replace />
+              )
             }
           />
           <Route
             path="/welcome"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['patient']}>
                 <LandingPage />
               </ProtectedRoute>
             }
@@ -88,7 +126,7 @@ function App() {
           <Route
             path="/dashboard"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['patient']}>
                 <DashboardPage />
               </ProtectedRoute>
             }
@@ -96,7 +134,7 @@ function App() {
           <Route
             path="/appointments"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['patient']}>
                 <AppointmentsPage />
               </ProtectedRoute>
             }
@@ -104,7 +142,7 @@ function App() {
           <Route
             path="/my-appointments"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['patient']}>
                 <MyAppointmentsPage />
               </ProtectedRoute>
             }
@@ -112,7 +150,7 @@ function App() {
           <Route
             path="/opd-departments"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['patient']}>
                 <OpdDepartmentsPage />
               </ProtectedRoute>
             }
@@ -120,7 +158,7 @@ function App() {
           <Route
             path="/opd-departments/:departmentSlug"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['patient']}>
                 <DepartmentDoctorsPage />
               </ProtectedRoute>
             }
@@ -128,7 +166,7 @@ function App() {
           <Route
             path="/doctor/:id"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['patient']}>
                 <DoctorProfilePage />
               </ProtectedRoute>
             }
@@ -136,7 +174,7 @@ function App() {
           <Route
             path="/chat-history"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['patient']}>
                 <ChatHistoryPage />
               </ProtectedRoute>
             }
@@ -144,7 +182,7 @@ function App() {
           <Route
             path="/triage"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['patient']}>
                 <TriagePage />
               </ProtectedRoute>
             }
@@ -152,7 +190,7 @@ function App() {
           <Route
             path="/lab-booking"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['patient']}>
                 <LabBookingPage />
               </ProtectedRoute>
             }
@@ -160,7 +198,7 @@ function App() {
           <Route
             path="/payment"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['patient']}>
                 <PaymentPage />
               </ProtectedRoute>
             }
@@ -168,7 +206,7 @@ function App() {
           <Route
             path="/booking-confirmation"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['patient']}>
                 <BookingConfirmationPage />
               </ProtectedRoute>
             }
@@ -176,7 +214,7 @@ function App() {
           <Route
             path="/medical-records"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['patient', 'hospital-admin']}>
                 <MedicalRecordsPage />
               </ProtectedRoute>
             }
@@ -184,17 +222,49 @@ function App() {
           <Route
             path="/admin/hospital"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['patient']}>
                 <AdminHospitalPanelPage />
               </ProtectedRoute>
             }
           />
-          <Route path="/app" element={<Navigate to="/welcome" replace />} />
+          <Route
+            path="/doctor-dashboard"
+            element={
+              <ProtectedRoute allowedRoles={['hospital-admin']}>
+                <HospitalDashboardPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/hospital-dashboard"
+            element={
+              <ProtectedRoute allowedRoles={['hospital-admin']}>
+                <Navigate to="/doctor-dashboard" replace />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/super-admin-dashboard"
+            element={
+              <ProtectedRoute allowedRoles={['super-admin']}>
+                <SuperAdminDashboardPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/app" element={<Navigate to="/" replace />} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </main>
 
       {currentUser ? <NotificationToast /> : null}
+
+      {showHospitalSelectionModal ? (
+        <HospitalSelectionModal
+          hospitals={hospitals}
+          initialHospitalId={state.patient.selectedHospitalId}
+          onConfirm={handleHospitalConfirm}
+        />
+      ) : null}
     </div>
   );
 }

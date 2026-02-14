@@ -2,12 +2,11 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import BookingStepHeader from '../components/appointments/BookingStepHeader';
 import DoctorInfoCard from '../components/doctors/DoctorInfoCard';
-import { departmentList, doctors, getDoctorsByDepartment } from '../services/mockDoctorsData';
 import { useApp } from '../context/AppContext';
 
 function AppointmentsPage() {
   const navigate = useNavigate();
-  const { addAppointment, loading } = useApp();
+  const { state, addAppointment, loading } = useApp();
   const [step, setStep] = useState(1);
   const [selectedDepartment, setSelectedDepartment] = useState('');
   const [selectedDoctor, setSelectedDoctor] = useState(null);
@@ -19,9 +18,23 @@ function AppointmentsPage() {
   const [showSummary, setShowSummary] = useState(false);
   const [confirmedAppointment, setConfirmedAppointment] = useState(null);
 
+  const selectedHospitalId = state.patient.selectedHospitalId || state.selectedHospital?.id;
+  const hospitalDoctors = useMemo(
+    () => state.doctors.filter((doctor) => doctor.hospitalId === selectedHospitalId),
+    [selectedHospitalId, state.doctors]
+  );
+
+  const hospitalDepartments = useMemo(
+    () => [...new Set(hospitalDoctors.map((doctor) => doctor.department))],
+    [hospitalDoctors]
+  );
+
   const departmentDoctors = useMemo(
-    () => (selectedDepartment ? getDoctorsByDepartment(selectedDepartment) : doctors),
-    [selectedDepartment]
+    () =>
+      selectedDepartment
+        ? hospitalDoctors.filter((doctor) => doctor.department === selectedDepartment)
+        : hospitalDoctors,
+    [selectedDepartment, hospitalDoctors]
   );
 
   const availableSlots = selectedDoctor?.availableTimeSlots || [];
@@ -72,7 +85,9 @@ function AppointmentsPage() {
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-med-600">Appointments</p>
           <h2 className="mt-1 text-xl font-semibold">Book Appointment</h2>
-          <p className="mt-1 text-sm text-slate-600">Complete the booking in 3 quick steps.</p>
+          <p className="mt-1 text-sm text-slate-600">
+            Complete the booking in 3 quick steps for {state.selectedHospital.name}.
+          </p>
         </div>
 
         <BookingStepHeader currentStep={step} />
@@ -81,7 +96,7 @@ function AppointmentsPage() {
           <div>
             <p className="mb-3 text-sm font-semibold">Step 1: Select Department</p>
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {departmentList.map((department) => (
+              {hospitalDepartments.map((department) => (
                 <button
                   key={department}
                   type="button"
