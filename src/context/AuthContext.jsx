@@ -163,36 +163,6 @@ export function AuthProvider({ children }) {
   const hospitalAdminLogin = async (email, password) => {
     const normalizedEmail = email.trim().toLowerCase();
 
-    // Check hardcoded doctor credentials first
-    // Check hardcoded doctor credentials
-    const foundDoctor = hardcodedDoctors.find(
-      (doc) => doc.email.toLowerCase() === normalizedEmail && doc.password === password
-    );
-
-    if (foundDoctor) {
-      const session = {
-        id: foundDoctor.doctorId,
-        email: foundDoctor.email,
-        name: foundDoctor.name,
-        doctorName: foundDoctor.doctorName,
-        doctorId: foundDoctor.doctorId, // Required for dashboard
-        department: foundDoctor.department,
-        role: 'doctor', // Specific role for doctors
-        hospitalId: foundDoctor.hospitalId,
-        hospitalName: foundDoctor.hospitalName,
-        token: createMockJwtToken({
-          role: 'doctor',
-          hospitalId: foundDoctor.hospitalId,
-          email: foundDoctor.email,
-        }),
-        loginAt: new Date().toISOString(),
-      };
-
-      saveSession(session);
-      setCurrentUser(session);
-      return session;
-    }
-
     // Check localStorage accounts
     const account = getHospitalAccounts().find(
       (item) => item.contactEmail?.trim().toLowerCase() === normalizedEmail
@@ -238,6 +208,41 @@ export function AuthProvider({ children }) {
     return session;
   };
 
+  const doctorLogin = async (email, password) => {
+    const normalizedEmail = email.trim().toLowerCase();
+
+    // Check hardcoded doctor credentials
+    const foundDoctor = hardcodedDoctors.find(
+      (doc) => doc.email.toLowerCase() === normalizedEmail && doc.password === password
+    );
+
+    if (foundDoctor) {
+      const session = {
+        id: foundDoctor.doctorId,
+        email: foundDoctor.email,
+        name: foundDoctor.name,
+        doctorName: foundDoctor.doctorName,
+        doctorId: foundDoctor.doctorId, // Required for dashboard
+        department: foundDoctor.department,
+        role: 'doctor', // Specific role for doctors
+        hospitalId: foundDoctor.hospitalId,
+        hospitalName: foundDoctor.hospitalName,
+        token: createMockJwtToken({
+          role: 'doctor',
+          hospitalId: foundDoctor.hospitalId,
+          email: foundDoctor.email,
+        }),
+        loginAt: new Date().toISOString(),
+      };
+
+      saveSession(session);
+      setCurrentUser(session);
+      return session;
+    }
+
+    throw new Error('Invalid doctor credentials.');
+  };
+
   const logout = async () => {
     clearSession();
     setCurrentUser(null);
@@ -278,6 +283,7 @@ export function AuthProvider({ children }) {
       superAdminLogin,
       hospitalSignup,
       hospitalAdminLogin,
+      doctorLogin,
       forgotPassword,
       logout,
       completeHospitalSelection,

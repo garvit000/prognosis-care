@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 function roleHome(role) {
   if (role === 'super-admin') return '/super-admin-dashboard';
   if (role === 'hospital-admin') return '/hospital-dashboard';
+  if (role === 'doctor') return '/doctor-workspace';
   return '/dashboard';
 }
 

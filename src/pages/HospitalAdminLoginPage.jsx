@@ -21,7 +21,7 @@ function HospitalAdminLoginPage() {
 
     try {
       await hospitalAdminLogin(form.email, form.password);
-      navigate('/doctor-dashboard');
+      navigate('/hospital-dashboard');
     } catch (err) {
       setError(err?.message || 'Invalid credentials');
     } finally {
@@ -34,22 +34,22 @@ function HospitalAdminLoginPage() {
       <div className="auth-split">
         <aside className="auth-brand-panel animate-fadeIn">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-blue-100">Doctor/Hospital Admin Access</p>
-            <h1 className="mt-3 text-4xl font-bold leading-tight">Hospital Management Portal</h1>
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-blue-100">Hospital Admin Access</p>
+            <h1 className="mt-3 text-4xl font-bold leading-tight">Hospital Management</h1>
             <p className="mt-4 max-w-md text-blue-100/90">
-              Secure access for hospital administrators to manage doctors, appointments, and hospital operations.
+              Manage your hospital profile, doctors, and appointments from a single dashboard.
             </p>
           </div>
           <div className="rounded-2xl border border-white/30 bg-white/10 p-4 text-sm text-blue-50 shadow-lg">
-            Secure access • Hospital management • Doctor administration
+            Hospital Administration • Staff Management • Analytics
           </div>
         </aside>
 
         <section className="auth-form-wrap animate-fadeIn">
           <div className="auth-glass-card">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-med-600">Doctor Login</p>
-            <h2 className="mt-1 text-3xl font-bold text-slate-900">Welcome back</h2>
-            <p className="mt-2 text-sm text-slate-600">Sign in to access your hospital admin dashboard.</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-med-600">Admin Portal</p>
+            <h2 className="mt-1 text-3xl font-bold text-slate-900">Hospital Login</h2>
+            <p className="mt-2 text-sm text-slate-600">Sign in to manage your hospital operations.</p>
 
             <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
               <div className="floating-field">
@@ -89,22 +89,22 @@ function HospitalAdminLoginPage() {
                     <span className="spinner" /> Signing in...
                   </span>
                 ) : (
-                  'Login as Doctor/Admin'
+                  'Login'
                 )}
               </button>
             </form>
 
             <div className="mt-5 border-t border-slate-200 pt-4 text-sm text-slate-600">
               <p>
-                Don't have an account?{' '}
+                New hospital?{' '}
                 <Link className="font-semibold text-med-700 transition hover:opacity-80" to="/hospital-signup">
-                  Sign up your hospital
+                  Register here
                 </Link>
               </p>
-              <p className="mt-2">
-                Patient login:{' '}
-                <Link className="font-semibold text-med-700 transition hover:opacity-80" to="/login">
-                  Sign in as patient
+              <p className="mt-2 text-xs text-slate-500">
+                Are you a doctor?{' '}
+                <Link className="font-semibold text-med-700 transition hover:opacity-80" to="/doctor-login">
+                  Go to Doctor Login
                 </Link>
               </p>
             </div>

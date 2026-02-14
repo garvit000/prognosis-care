@@ -24,6 +24,7 @@ import SuperAdminDashboardPage from './pages/SuperAdminDashboardPage';
 import AuthOptionsPage from './pages/AuthOptionsPage';
 import NotFoundPage from './pages/NotFoundPage';
 import LoginPage from './pages/LoginPage';
+import DoctorLoginPage from './pages/DoctorLoginPage';
 import SignupPage from './pages/SignupPage';
 import NotificationToast from './components/NotificationToast';
 import HospitalSelectionModal from './components/HospitalSelectionModal';
@@ -41,8 +42,13 @@ const patientNavItems = [
 ];
 
 const hospitalNavItems = [
-  { to: '/doctor-dashboard', label: 'Doctor Admin Dashboard' },
+  { to: '/hospital-dashboard', label: 'Hospital Dashboard' },
   { to: '/medical-records', label: 'Medical Records' },
+];
+
+const doctorNavItems = [
+  { to: '/doctor-workspace', label: 'Doctor Workspace' },
+  { to: '/my-appointments', label: 'My Calendar' },
 ];
 
 const superAdminNavItems = [
@@ -67,7 +73,9 @@ function App() {
       ? superAdminNavItems
       : currentUser?.role === 'hospital-admin'
         ? hospitalNavItems
-        : patientNavItems;
+        : currentUser?.role === 'doctor'
+          ? doctorNavItems
+          : patientNavItems;
 
   const showGlobalBackButton = location.pathname !== '/auth' && location.pathname !== '/';
 
@@ -117,6 +125,7 @@ function App() {
           <Route path="/super-admin-login" element={<SuperAdminLoginPage />} />
           <Route path="/hospital-signup" element={<HospitalSignupPage />} />
           <Route path="/hospital-login" element={<HospitalLoginPage />} />
+          <Route path="/doctor-login" element={<DoctorLoginPage />} />
           <Route path="/hospital-admin-login" element={<HospitalAdminLoginPage />} />
           <Route
             path="/"
@@ -155,7 +164,7 @@ function App() {
           <Route
             path="/my-appointments"
             element={
-              <ProtectedRoute allowedRoles={['patient']}>
+              <ProtectedRoute allowedRoles={['patient', 'doctor']}>
                 <MyAppointmentsPage />
               </ProtectedRoute>
             }
@@ -260,7 +269,7 @@ function App() {
             path="/hospital-dashboard"
             element={
               <ProtectedRoute allowedRoles={['hospital-admin']}>
-                <Navigate to="/doctor-dashboard" replace />
+                <HospitalDashboardPage />
               </ProtectedRoute>
             }
           />

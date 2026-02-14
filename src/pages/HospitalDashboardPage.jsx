@@ -6,14 +6,32 @@ function HospitalDashboardPage() {
   const { currentUser } = useAuth();
   const { state, updateAppointmentStatus, cancelAppointment } = useApp();
 
-  console.log('👨‍⚕️ Doctor Dashboard - Current User:', currentUser);
-  console.log('📋 Total Appointments in State:', state.appointments.length);
-  console.log('🔍 Filtering by doctorName:', currentUser?.doctorName);
+  console.log('🏥 Hospital Dashboard - Current User:', currentUser);
 
-  const doctorAppointments = useMemo(
-    () => state.appointments.filter((appointment) => appointment.doctorName === currentUser?.doctorName),
-    [state.appointments, currentUser?.doctorName]
-  );
+  // Filter appointments for the entire hospital
+  // If we had a backend, this would be a query. For mock state, we filter by hospitalName matching.
+  // Note: Appointments in mock state might not have hospitalName directly, but we can try to match by doctor's hospital.
+  // For simplicity in this mock, we assume appointments having 'hospitalName' or we match by doctor.
+
+  // Let's rely on matching doctor's hospital from state.doctors if available, or just filter by hospitalName if stored on appointment.
+  // In our mock data, appointments have 'doctor_id'. We can find the doctor and check their hospital.
+
+  const hospitalAppointments = useMemo(() => {
+    if (!currentUser?.hospitalName) return [];
+
+    return state.appointments.filter(app => {
+      // Direct match if appointment has hospitalName (it might not)
+      if (app.hospitalName === currentUser.hospitalName) return true;
+
+      // Match via doctor
+      const doc = state.doctors.find(d => d.id === app.doctor_id);
+      return doc?.hospitalName === currentUser.hospitalName;
+    });
+  }, [state.appointments, currentUser?.hospitalName, state.doctors]);
+
+  const doctorAppointments = hospitalAppointments; // Alias for compatibility with existing code structure below
+
+  console.log('✅ Hospital Appointments Found:', doctorAppointments.length);
 
   console.log('✅ Doctor Appointments Found:', doctorAppointments.length);
 
@@ -101,14 +119,13 @@ function HospitalDashboardPage() {
           </div>
         </div>
       )}
-      
+
       <section className="card bg-gradient-to-r from-med-50 to-blue-50 border-med-200">
         <div className="flex items-start justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-med-600">Doctor Dashboard</p>
-            <h2 className="mt-1 text-2xl font-bold text-med-900">{currentUser?.name}</h2>
-            <p className="mt-1 text-sm text-slate-700 font-medium">{currentUser?.department} Department</p>
-            <p className="text-sm text-slate-600">{currentUser?.hospitalName}</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-med-600">Hospital Administration</p>
+            <h2 className="mt-1 text-2xl font-bold text-med-900">{currentUser?.hospitalName}</h2>
+            <p className="mt-1 text-sm text-slate-700 font-medium">Administrator Dashboard</p>
             <p className="mt-2 text-xs text-slate-500">
               📧 {currentUser?.email}
             </p>
@@ -201,7 +218,7 @@ function HospitalDashboardPage() {
                         <span className="font-semibold">Patient ID:</span> {appointment.patient_id}
                       </p>
                       <p className="text-sm text-slate-700 mt-2 bg-amber-50 border border-amber-200 rounded-lg p-2">
-                        <span className="font-semibold text-amber-900">Chief Complaint:</span><br/>
+                        <span className="font-semibold text-amber-900">Chief Complaint:</span><br />
                         {appointment.reason}
                       </p>
                       {appointment.uploadedMedicalFile && (
@@ -211,7 +228,7 @@ function HospitalDashboardPage() {
                         </p>
                       )}
                       <p className="text-xs text-slate-500 mt-2">
-                        <span className="font-semibold">Fee:</span> ₹{appointment.consultationFee} • 
+                        <span className="font-semibold">Fee:</span> ₹{appointment.consultationFee} •
                         <span className="font-semibold">Apt ID:</span> {appointment.id}
                       </p>
                     </div>
@@ -254,12 +271,11 @@ function HospitalDashboardPage() {
         {doctorAppointments.length > 0 ? (
           <div className="space-y-2">
             {doctorAppointments.map((appointment) => (
-              <article key={appointment.id} className={`rounded-lg border p-3 ${
-                appointment.status === 'Completed' ? 'bg-green-50 border-green-200' :
+              <article key={appointment.id} className={`rounded-lg border p-3 ${appointment.status === 'Completed' ? 'bg-green-50 border-green-200' :
                 appointment.status === 'Cancelled' ? 'bg-red-50 border-red-200' :
-                isToday(appointment.date) ? 'bg-blue-50 border-blue-300 border-2' :
-                'bg-white border-slate-200'
-              }`}>
+                  isToday(appointment.date) ? 'bg-blue-50 border-blue-300 border-2' :
+                    'bg-white border-slate-200'
+                }`}>
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
@@ -329,7 +345,7 @@ function HospitalDashboardPage() {
               const completedCount = appointments.filter(a => a.status === 'Completed').length;
               const upcomingCount = appointments.filter(a => a.status === 'Upcoming').length;
               const totalFees = appointments.filter(a => a.status === 'Completed').reduce((sum, a) => sum + (a.consultationFee || 0), 0);
-              
+
               return (
                 <article key={patientName} className="rounded-xl border-2 border-purple-300 bg-white p-4 shadow-sm">
                   <div className="flex items-start justify-between mb-3 pb-3 border-b border-purple-200">
@@ -360,11 +376,10 @@ function HospitalDashboardPage() {
                   </div>
                   <div className="space-y-2">
                     {appointments.sort((a, b) => new Date(b.date) - new Date(a.date)).map((appointment) => (
-                      <div key={appointment.id} className={`rounded-lg p-3 text-sm border-l-4 ${
-                        appointment.status === 'Completed' ? 'bg-green-50 border-green-500' :
+                      <div key={appointment.id} className={`rounded-lg p-3 text-sm border-l-4 ${appointment.status === 'Completed' ? 'bg-green-50 border-green-500' :
                         appointment.status === 'Cancelled' ? 'bg-red-50 border-red-500' :
-                        'bg-blue-50 border-blue-500'
-                      }`}>
+                          'bg-blue-50 border-blue-500'
+                        }`}>
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-1">
@@ -378,7 +393,7 @@ function HospitalDashboardPage() {
                               <span className="font-semibold">Chief Complaint:</span> {appointment.reason}
                             </p>
                             <p className="text-slate-600 text-xs mt-1">
-                              <span className="font-semibold">Fee:</span> ₹{appointment.consultationFee} • 
+                              <span className="font-semibold">Fee:</span> ₹{appointment.consultationFee} •
                               <span className="font-semibold"> ID:</span> {appointment.id}
                             </p>
                             {appointment.uploadedMedicalFile && (
@@ -409,15 +424,11 @@ function HospitalDashboardPage() {
             {currentUser?.name?.split(' ').map(n => n[0]).join('').slice(0, 2)}
           </div>
           <div className="flex-1">
-            <h3 className="text-xl font-bold text-med-900">Doctor Profile</h3>
+            <h3 className="text-xl font-bold text-med-900">Admin Profile</h3>
             <div className="mt-3 grid gap-2">
               <div className="flex items-start gap-2">
-                <span className="text-med-600 font-semibold min-w-[120px]">👨‍⚕️ Name:</span>
+                <span className="text-med-600 font-semibold min-w-[120px]">👨‍💼 Name:</span>
                 <span className="text-slate-700">{currentUser?.name}</span>
-              </div>
-              <div className="flex items-start gap-2">
-                <span className="text-med-600 font-semibold min-w-[120px]">🏥 Department:</span>
-                <span className="text-slate-700">{currentUser?.department}</span>
               </div>
               <div className="flex items-start gap-2">
                 <span className="text-med-600 font-semibold min-w-[120px]">🏢 Hospital:</span>
@@ -428,8 +439,8 @@ function HospitalDashboardPage() {
                 <span className="text-slate-700">{currentUser?.email}</span>
               </div>
               <div className="flex items-start gap-2">
-                <span className="text-med-600 font-semibold min-w-[120px]">🆔 Hospital ID:</span>
-                <span className="text-slate-700">{currentUser?.hospitalId}</span>
+                <span className="text-med-600 font-semibold min-w-[120px]">🆔 Admin ID:</span>
+                <span className="text-slate-700">{currentUser?.id}</span>
               </div>
             </div>
             <div className="mt-4 pt-4 border-t border-med-200">
