@@ -6,7 +6,7 @@ import {
   getHospitalRequests,
   submitHospitalSignup,
 } from '../services/adminStore';
-import { secureSuperAdminCredentials, secureDoctorCredentials } from '../services/secureAuthConfig';
+import { secureSuperAdminCredentials, hardcodedDoctors } from '../services/secureAuthConfig';
 
 const AuthContext = createContext(null);
 const AUTH_SESSION_KEY = 'pc_auth_session';
@@ -21,6 +21,7 @@ function createMockJwtToken(payload) {
 function getRoleHomeRoute(role) {
   if (role === 'super-admin') return '/super-admin-dashboard';
   if (role === 'hospital-admin') return '/doctor-dashboard';
+  if (role === 'doctor') return '/doctor-workspace';
   return '/welcome';
 }
 
@@ -163,32 +164,33 @@ export function AuthProvider({ children }) {
     const normalizedEmail = email.trim().toLowerCase();
 
     // Check hardcoded doctor credentials first
-    if (secureDoctorCredentials.email && secureDoctorCredentials.password) {
-      if (
-        normalizedEmail === secureDoctorCredentials.email.toLowerCase() &&
-        password === secureDoctorCredentials.password
-      ) {
-        const session = {
-          id: secureDoctorCredentials.hospitalId,
-          email: secureDoctorCredentials.email,
-          name: secureDoctorCredentials.name,
-          doctorName: secureDoctorCredentials.doctorName,
-          department: secureDoctorCredentials.department,
-          role: 'hospital-admin',
-          hospitalId: secureDoctorCredentials.hospitalId,
-          hospitalName: secureDoctorCredentials.hospitalName,
-          token: createMockJwtToken({
-            role: 'hospital-admin',
-            hospitalId: secureDoctorCredentials.hospitalId,
-            email: secureDoctorCredentials.email,
-          }),
-          loginAt: new Date().toISOString(),
-        };
+    // Check hardcoded doctor credentials
+    const foundDoctor = hardcodedDoctors.find(
+      (doc) => doc.email.toLowerCase() === normalizedEmail && doc.password === password
+    );
 
-        saveSession(session);
-        setCurrentUser(session);
-        return session;
-      }
+    if (foundDoctor) {
+      const session = {
+        id: foundDoctor.doctorId,
+        email: foundDoctor.email,
+        name: foundDoctor.name,
+        doctorName: foundDoctor.doctorName,
+        doctorId: foundDoctor.doctorId, // Required for dashboard
+        department: foundDoctor.department,
+        role: 'doctor', // Specific role for doctors
+        hospitalId: foundDoctor.hospitalId,
+        hospitalName: foundDoctor.hospitalName,
+        token: createMockJwtToken({
+          role: 'doctor',
+          hospitalId: foundDoctor.hospitalId,
+          email: foundDoctor.email,
+        }),
+        loginAt: new Date().toISOString(),
+      };
+
+      saveSession(session);
+      setCurrentUser(session);
+      return session;
     }
 
     // Check localStorage accounts

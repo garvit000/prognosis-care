@@ -7,6 +7,7 @@ import MyAppointmentsPage from './pages/MyAppointmentsPage';
 import OpdDepartmentsPage from './pages/OpdDepartmentsPage';
 import DepartmentDoctorsPage from './pages/DepartmentDoctorsPage';
 import DoctorProfilePage from './pages/DoctorProfilePage';
+import DoctorDashboardPage from './pages/DoctorDashboardPage';
 import ChatHistoryPage from './pages/ChatHistoryPage';
 import TriagePage from './pages/TriagePage';
 import LabBookingPage from './pages/LabBookingPage';
@@ -86,8 +87,7 @@ function App() {
                     key={item.to}
                     to={item.to}
                     className={({ isActive }) =>
-                      `rounded-xl px-3 py-2 text-sm font-medium transition ${
-                        isActive ? 'bg-med-100 text-med-700' : 'text-slate-600 hover:bg-slate-100'
+                      `rounded-xl px-3 py-2 text-sm font-medium transition ${isActive ? 'bg-med-100 text-med-700' : 'text-slate-600 hover:bg-slate-100'
                       }`
                     }
                   >
@@ -245,6 +245,14 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['hospital-admin']}>
                 <HospitalDashboardPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/doctor-workspace"
+            element={
+              <ProtectedRoute allowedRoles={['doctor']}>
+                <DoctorDashboardPage />
               </ProtectedRoute>
             }
           />

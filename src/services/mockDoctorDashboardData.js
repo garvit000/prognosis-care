@@ -28,8 +28,15 @@ function buildSeedData() {
   const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const dayAfter = new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
-  const firstDoctor = doctors[0];
-  const secondDoctor = doctors[1];
+  // Use the specific IDs from our hardcoded set
+  const drVikramId = 'hosp-2-cardiology-1'; // Fortis Cardio
+  const drArjunId = 'hosp-2-pulmonology-1'; // Fortis Pulmo
+  const drAmitId = 'hosp-1-general-medicine-1'; // CityCare GenMed
+
+  // Fallback to first available if not found (though they should exist)
+  const firstDoctor = doctors.find(d => d.id === drVikramId) || doctors[0];
+  const secondDoctor = doctors.find(d => d.id === drArjunId) || doctors[1];
+  const thirdDoctor = doctors.find(d => d.id === drAmitId) || doctors[2];
 
   const patients = [
     {
@@ -55,7 +62,7 @@ function buildSeedData() {
     },
     {
       id: 'PT-3002',
-      doctor_id: firstDoctor.id,
+      doctor_id: firstDoctor.id, // Vikram
       fullName: 'Meera Patil',
       age: 29,
       gender: 'Female',
@@ -76,7 +83,7 @@ function buildSeedData() {
     },
     {
       id: 'PT-3003',
-      doctor_id: secondDoctor.id,
+      doctor_id: secondDoctor.id, // Arjun
       fullName: 'Rohan Nair',
       age: 47,
       gender: 'Male',
@@ -84,11 +91,26 @@ function buildSeedData() {
       phone: '+91 90000 44556',
       email: 'rohan.nair@gmail.com',
       allergies: ['None'],
-      chronicConditions: ['Migraine'],
-      aiSummary: 'Recurring migraine episodes. Trigger diary and MRI review advised.',
-      medicalHistory: ['Migraine (5 years)'],
+      chronicConditions: ['Asthma'],
+      aiSummary: 'Recurring asthma episodes. Bronchoscopy recommended.',
+      medicalHistory: ['Asthma (5 years)'],
       uploadedFiles: [],
     },
+    {
+      id: 'PT-3004',
+      doctor_id: thirdDoctor.id, // Amit
+      fullName: 'Suresh Kumar',
+      age: 55,
+      gender: 'Male',
+      bloodGroup: 'AB+',
+      phone: '+91 90000 77889',
+      email: 'suresh.kumar@gmail.com',
+      allergies: ['Dust'],
+      chronicConditions: ['Diabetes'],
+      aiSummary: 'Blood sugar levels fluctuating. Diet review needed.',
+      medicalHistory: ['Diabetes Type 2'],
+      uploadedFiles: [],
+    }
   ];
 
   const appointments = [
@@ -102,6 +124,8 @@ function buildSeedData() {
       riskLevel: 'High',
       department: firstDoctor.department,
       status: 'Upcoming',
+      consultationFee: firstDoctor.consultationFee,
+      patientName: 'Aarav Singh', // Add patient name for simpler display
       createdAt: new Date().toISOString(),
     },
     {
@@ -114,6 +138,8 @@ function buildSeedData() {
       riskLevel: 'Medium',
       department: firstDoctor.department,
       status: 'Upcoming',
+      consultationFee: firstDoctor.consultationFee,
+      patientName: 'Meera Patil',
       createdAt: new Date().toISOString(),
     },
     {
@@ -126,20 +152,38 @@ function buildSeedData() {
       riskLevel: 'Low',
       department: firstDoctor.department,
       status: 'Upcoming',
+      consultationFee: firstDoctor.consultationFee,
+      patientName: 'Meera Patil',
       createdAt: new Date().toISOString(),
     },
     {
       id: 'DAPT-9004',
       doctor_id: secondDoctor.id,
       patient_id: 'PT-3003',
-      date: dayAfter,
+      date: today, // Move to today for visibility
       time: '10:45 AM',
-      reason: 'Migraine assessment',
+      reason: 'Breathing difficulty',
       riskLevel: 'Medium',
       department: secondDoctor.department,
       status: 'Upcoming',
+      consultationFee: secondDoctor.consultationFee,
+      patientName: 'Rohan Nair',
       createdAt: new Date().toISOString(),
     },
+    {
+      id: 'DAPT-9005',
+      doctor_id: thirdDoctor.id,
+      patient_id: 'PT-3004',
+      date: today,
+      time: '04:00 PM',
+      reason: 'General checkup',
+      riskLevel: 'Low',
+      department: thirdDoctor.department,
+      status: 'Upcoming',
+      consultationFee: thirdDoctor.consultationFee,
+      patientName: 'Suresh Kumar',
+      createdAt: new Date().toISOString(),
+    }
   ];
 
   const reports = [
@@ -161,6 +205,28 @@ function buildSeedData() {
       testType: 'TSH & T3/T4 Panel',
       uploadedDate: tomorrow,
       fileName: 'thyroid-lab-report.pdf',
+      fileUrl: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+      status: 'Pending',
+      remarks: '',
+    },
+    {
+      id: 'DLAB-7003',
+      doctor_id: secondDoctor.id,
+      patient_id: 'PT-3003',
+      testType: 'Spirometry Report',
+      uploadedDate: today,
+      fileName: 'spirometry.pdf',
+      fileUrl: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+      status: 'Pending',
+      remarks: '',
+    },
+    {
+      id: 'DLAB-7004',
+      doctor_id: thirdDoctor.id,
+      patient_id: 'PT-3004',
+      testType: 'HbA1c Report',
+      uploadedDate: today,
+      fileName: 'hba1c-report.pdf',
       fileUrl: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
       status: 'Pending',
       remarks: '',
