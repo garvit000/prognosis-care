@@ -7,6 +7,7 @@ import {
   processMockPayment,
   uploadReportMock,
 } from '../services/mockApi';
+import { fetchGeminiRecommendations } from '../services/geminiService';
 
 const AppContext = createContext(null);
 const PATIENT_PROFILE_KEY = 'pc_patient_profile';
@@ -557,7 +558,16 @@ export function AppProvider({ children }) {
     }
 
     setLoading((prev) => ({ ...prev, recommendations: true }));
-    const data = await fetchAiRecommendations();
+
+    let data;
+    try {
+      // Call Gemini AI with the actual symptoms
+      data = await fetchGeminiRecommendations(cleanSymptoms);
+    } catch (err) {
+      console.warn('Gemini API failed, falling back to mock data:', err.message);
+      data = await fetchAiRecommendations();
+    }
+
     setState((prev) => ({
       ...prev,
       patientSymptoms: cleanSymptoms,
