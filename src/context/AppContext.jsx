@@ -7,6 +7,66 @@ import {
 } from '../services/mockApi';
 
 const AppContext = createContext(null);
+const PATIENT_PROFILE_KEY = 'pc_patient_profile';
+const APPOINTMENTS_KEY = 'pc_appointments';
+const MEDICAL_RECORDS_KEY = 'pc_medical_records';
+
+const emptyPatientProfile = {
+  id: 'PAT-1001',
+  name: '',
+  dob: '',
+  bloodGroup: '',
+  gender: '',
+  emergencyContact: '',
+  lastCheckupDate: '',
+  riskLevel: 'low',
+  bp: '',
+};
+
+function getStoredPatientProfile() {
+  try {
+    const saved = localStorage.getItem(PATIENT_PROFILE_KEY);
+    if (!saved) return null;
+    return JSON.parse(saved);
+  } catch {
+    return null;
+  }
+}
+
+function getStoredList(key) {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function readFileAsDataURL(file) {
+  return new Promise((resolve) => {
+    if (!file) {
+      resolve('');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+    reader.onerror = () => resolve('');
+    reader.readAsDataURL(file);
+  });
+}
+
+function inferRiskLevelFromBp(bp) {
+  if (!bp?.includes('/')) return 'low';
+  const [systolicText, diastolicText] = bp.split('/');
+  const systolic = Number(systolicText);
+  const diastolic = Number(diastolicText);
+
+  if (Number.isNaN(systolic) || Number.isNaN(diastolic)) return 'low';
+  if (systolic >= 140 || diastolic >= 90) return 'high';
+  if (systolic >= 130 || diastolic >= 85) return 'medium';
+  return 'low';
+}
 
 const hospitals = [
   {
@@ -14,24 +74,46 @@ const hospitals = [
     name: 'CityCare Multi-Speciality Hospital',
     locations: ['Downtown Center', 'North Campus', 'East Wing Diagnostics'],
     address: '12 Heartline Ave, MedCity',
+    description:
+      'A tertiary-care center known for rapid cardiac diagnostics, integrated emergency response, and patient-centric preventive care programs.',
+    specialties: ['Cardiology', 'Internal Medicine', 'Radiology', 'Pathology'],
+    specialistUnits: [
+      'Cardiac Surgery Specialists',
+      'Interventional Cardiologists',
+      'Neurology Consultants',
+      'Orthopedic Surgery Team',
+    ],
+    facilities: [
+      '3T MRI & CT Imaging Suite',
+      'Modular Operation Theatres',
+      '24/7 Cath Lab',
+      'Dialysis & Critical Care ICU',
+      'Advanced Pathology & Blood Bank',
+    ],
+    accreditation: 'NABH Accredited',
+    rating: 4.7,
+    emergencySupport: '24/7 Emergency & ICU',
     insuranceAvailable: true,
     serviceFee: 199,
     taxRate: 0.12,
   },
 ];
 
+const storedProfile = getStoredPatientProfile();
+const storedAppointments = getStoredList(APPOINTMENTS_KEY);
+const storedMedicalRecords = getStoredList(MEDICAL_RECORDS_KEY);
+
 const initialState = {
-  patient: {
-    id: 'PAT-1001',
-    name: 'Aarav Patel',
-    age: 46,
-    bp: '150/95',
-  },
+  patient: storedProfile ? { ...emptyPatientProfile, ...storedProfile } : emptyPatientProfile,
+  profileCompleted: Boolean(storedProfile?.name && storedProfile?.dob),
+  patientSymptoms: '',
   recommendedTests: [],
   recommendationSummary: '',
   selectedHospital: hospitals[0],
   draftBooking: null,
   latestBooking: null,
+  appointments: storedAppointments,
+  medicalRecords: storedMedicalRecords,
   paymentHistory: [],
   reports: [],
   notifications: [],
@@ -87,10 +169,28 @@ export function AppProvider({ children }) {
   const [loading, setLoading] = useState({
     recommendations: false,
     booking: false,
+    appointment: false,
     payment: false,
     reportUpload: false,
   });
   const [paymentError, setPaymentError] = useState('');
+
+  const updatePatientProfile = (profileInput) => {
+    const riskLevel = inferRiskLevelFromBp(profileInput.bp);
+    const nextPatient = {
+      ...state.patient,
+      ...profileInput,
+      riskLevel,
+    };
+
+    localStorage.setItem(PATIENT_PROFILE_KEY, JSON.stringify(nextPatient));
+
+    setState((prev) => ({
+      ...prev,
+      patient: nextPatient,
+      profileCompleted: true,
+    }));
+  };
 
   const pushNotification = (message) => {
     setState((prev) => ({
@@ -99,11 +199,133 @@ export function AppProvider({ children }) {
     }));
   };
 
-  const loadRecommendations = async () => {
+  const persistAppointments = (appointments) => {
+    localStorage.setItem(APPOINTMENTS_KEY, JSON.stringify(appointments));
+  };
+
+  const persistMedicalRecords = (records) => {
+    localStorage.setItem(MEDICAL_RECORDS_KEY, JSON.stringify(records));
+  };
+
+  const addMedicalRecord = async ({ file, recordType, notes, appointmentId, doctorName }) => {
+    const previewUrl = await readFileAsDataURL(file);
+    const newRecord = {
+      id: `MR-${Date.now().toString().slice(-8)}`,
+      fileName: file?.name || 'record',
+      mimeType: file?.type || 'application/octet-stream',
+      previewUrl,
+      recordType,
+      notes: notes || '',
+      linkedAppointmentId: appointmentId || null,
+      linkedDoctorName: doctorName || '',
+      uploadDate: new Date().toISOString(),
+      source: 'user',
+    };
+
+    setState((prev) => {
+      const nextRecords = [newRecord, ...prev.medicalRecords];
+      persistMedicalRecords(nextRecords);
+      return {
+        ...prev,
+        medicalRecords: nextRecords,
+      };
+    });
+
+    return newRecord;
+  };
+
+  const deleteMedicalRecord = (recordId) => {
+    setState((prev) => {
+      const nextRecords = prev.medicalRecords.filter((record) => record.id !== recordId);
+      persistMedicalRecords(nextRecords);
+      return {
+        ...prev,
+        medicalRecords: nextRecords,
+      };
+    });
+  };
+
+  const addAppointment = async ({ doctor, department, date, time, reason, file, recordType }) => {
+    setLoading((prev) => ({ ...prev, appointment: true }));
+
+    const appointmentId = `APT-${Date.now().toString().slice(-8)}`;
+    const filePreview = await readFileAsDataURL(file);
+
+    const appointment = {
+      id: appointmentId,
+      doctorId: doctor.id,
+      doctorName: doctor.fullName,
+      department,
+      date,
+      time,
+      reason,
+      consultationFee: doctor.consultationFee,
+      status: 'Upcoming',
+      createdAt: new Date().toISOString(),
+      uploadedMedicalFile: file
+        ? {
+            fileName: file.name,
+            mimeType: file.type,
+            previewUrl: filePreview,
+          }
+        : null,
+    };
+
+    setState((prev) => {
+      const nextAppointments = [appointment, ...prev.appointments];
+      persistAppointments(nextAppointments);
+      return {
+        ...prev,
+        appointments: nextAppointments,
+      };
+    });
+
+    if (file) {
+      await addMedicalRecord({
+        file,
+        recordType: recordType || 'Appointment Attachment',
+        notes: reason,
+        appointmentId: appointment.id,
+        doctorName: doctor.fullName,
+      });
+    }
+
+    pushNotification(`Appointment booked with ${doctor.fullName}.`);
+    setLoading((prev) => ({ ...prev, appointment: false }));
+    return appointment;
+  };
+
+  const cancelAppointment = (appointmentId) => {
+    setState((prev) => {
+      const nextAppointments = prev.appointments.map((appointment) =>
+        appointment.id === appointmentId ? { ...appointment, status: 'Cancelled' } : appointment
+      );
+      persistAppointments(nextAppointments);
+      return {
+        ...prev,
+        appointments: nextAppointments,
+      };
+    });
+    pushNotification('Appointment cancelled.');
+  };
+
+  const loadRecommendations = async (symptomsText) => {
+    const cleanSymptoms = symptomsText?.trim();
+    if (!cleanSymptoms) {
+      setState((prev) => ({
+        ...prev,
+        patientSymptoms: '',
+        recommendedTests: [],
+        recommendationSummary: '',
+      }));
+      return;
+    }
+
     setLoading((prev) => ({ ...prev, recommendations: true }));
     const data = await fetchAiRecommendations();
     setState((prev) => ({
       ...prev,
+      patientSymptoms: cleanSymptoms,
       recommendedTests: data.tests,
       recommendationSummary: data.summary,
     }));
@@ -208,21 +430,42 @@ export function AppProvider({ children }) {
       fileName,
     });
 
-    setState((prev) => ({
-      ...prev,
-      reports: [
+    setState((prev) => {
+      const nextMedicalRecords = [
         {
-          ...report,
-          hospitalName: prev.latestBooking.hospital.name,
-          testNames: prev.latestBooking.tests.map((test) => test.name),
+          id: report.reportId,
+          fileName: report.fileName,
+          mimeType: 'application/pdf',
+          previewUrl: '',
+          recordType: 'Lab Report',
+          notes: prev.latestBooking.tests.map((test) => test.name).join(', '),
+          linkedAppointmentId: null,
+          linkedDoctorName: '',
+          uploadDate: report.uploadedAt,
+          source: 'hospital',
         },
-        ...prev.reports,
-      ],
-      latestBooking: {
-        ...prev.latestBooking,
-        reportStatus: 'Available',
-      },
-    }));
+        ...prev.medicalRecords,
+      ];
+
+      persistMedicalRecords(nextMedicalRecords);
+
+      return {
+        ...prev,
+        reports: [
+          {
+            ...report,
+            hospitalName: prev.latestBooking.hospital.name,
+            testNames: prev.latestBooking.tests.map((test) => test.name),
+          },
+          ...prev.reports,
+        ],
+        medicalRecords: nextMedicalRecords,
+        latestBooking: {
+          ...prev.latestBooking,
+          reportStatus: 'Available',
+        },
+      };
+    });
 
     setLoading((prev) => ({ ...prev, reportUpload: false }));
     pushNotification('New lab report is now available in Medical Records.');
@@ -235,6 +478,12 @@ export function AppProvider({ children }) {
       hospitals,
       loading,
       paymentError,
+      updatePatientProfile,
+      addAppointment,
+      cancelAppointment,
+      addMedicalRecord,
+      deleteMedicalRecord,
+      pushNotification,
       loadRecommendations,
       saveDraftBooking,
       confirmBooking,

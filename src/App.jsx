@@ -1,5 +1,12 @@
 import { NavLink, Navigate, Route, Routes } from 'react-router-dom';
+import LandingPage from './pages/LandingPage';
 import DashboardPage from './pages/DashboardPage';
+import AppointmentsPage from './pages/AppointmentsPage';
+import MyAppointmentsPage from './pages/MyAppointmentsPage';
+import OpdDepartmentsPage from './pages/OpdDepartmentsPage';
+import DepartmentDoctorsPage from './pages/DepartmentDoctorsPage';
+import DoctorProfilePage from './pages/DoctorProfilePage';
+import ChatHistoryPage from './pages/ChatHistoryPage';
 import TriagePage from './pages/TriagePage';
 import LabBookingPage from './pages/LabBookingPage';
 import PaymentPage from './pages/PaymentPage';
@@ -14,7 +21,9 @@ import ProtectedRoute from './components/ProtectedRoute';
 import { useAuth } from './context/AuthContext';
 
 const navItems = [
-  { to: '/', label: 'Dashboard' },
+  { to: '/dashboard', label: 'Dashboard' },
+  { to: '/welcome', label: 'Welcome' },
+  { to: '/my-appointments', label: 'My Appointments' },
   { to: '/triage', label: 'AI Assistant' },
   { to: '/medical-records', label: 'Medical Records' },
   { to: '/admin/hospital', label: 'Hospital Panel' },
@@ -64,7 +73,71 @@ function App() {
             path="/"
             element={
               <ProtectedRoute>
+                <Navigate to="/welcome" replace />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/welcome"
+            element={
+              <ProtectedRoute>
+                <LandingPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
                 <DashboardPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/appointments"
+            element={
+              <ProtectedRoute>
+                <AppointmentsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/my-appointments"
+            element={
+              <ProtectedRoute>
+                <MyAppointmentsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/opd-departments"
+            element={
+              <ProtectedRoute>
+                <OpdDepartmentsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/opd-departments/:departmentSlug"
+            element={
+              <ProtectedRoute>
+                <DepartmentDoctorsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/doctor/:id"
+            element={
+              <ProtectedRoute>
+                <DoctorProfilePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/chat-history"
+            element={
+              <ProtectedRoute>
+                <ChatHistoryPage />
               </ProtectedRoute>
             }
           />
@@ -116,7 +189,7 @@ function App() {
               </ProtectedRoute>
             }
           />
-          <Route path="/app" element={<Navigate to="/" replace />} />
+          <Route path="/app" element={<Navigate to="/welcome" replace />} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </main>
