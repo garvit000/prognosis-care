@@ -7,3 +7,13 @@ export const secureSuperAdminCredentials = {
   password: import.meta.env.VITE_SUPER_ADMIN_PASSWORD || '',
   name: import.meta.env.VITE_SUPER_ADMIN_NAME || 'Platform Owner',
 };
+
+export const secureDoctorCredentials = {
+  email: import.meta.env.VITE_DOCTOR_LOGIN_EMAIL || '',
+  password: import.meta.env.VITE_DOCTOR_LOGIN_PASSWORD || '',
+  name: 'Dr. Garvit Pathania',
+  doctorName: 'Dr. Garvit Pathania',
+  department: 'Neurology',
+  hospitalName: 'Max Hospital',
+  hospitalId: 'hosp-3',
+};

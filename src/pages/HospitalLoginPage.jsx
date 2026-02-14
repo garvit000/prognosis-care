@@ -1,8 +1,8 @@
 import { Navigate } from 'react-router-dom';
 
 function HospitalLoginPage() {
-  // Dedicated route retained for backward compatibility.
-  return <Navigate to="/login?role=hospital-admin" replace />;
+  // Redirect to dedicated hospital admin login page
+  return <Navigate to="/hospital-admin-login" replace />;
 }
 
 export default HospitalLoginPage;

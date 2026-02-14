@@ -16,6 +16,7 @@ import MedicalRecordsPage from './pages/MedicalRecordsPage';
 import AdminHospitalPanelPage from './pages/AdminHospitalPanelPage';
 import HospitalSignupPage from './pages/HospitalSignupPage';
 import HospitalLoginPage from './pages/HospitalLoginPage';
+import HospitalAdminLoginPage from './pages/HospitalAdminLoginPage';
 import HospitalDashboardPage from './pages/HospitalDashboardPage';
 import SuperAdminLoginPage from './pages/SuperAdminLoginPage';
 import SuperAdminDashboardPage from './pages/SuperAdminDashboardPage';
@@ -116,6 +117,7 @@ function App() {
           <Route path="/super-admin-login" element={<SuperAdminLoginPage />} />
           <Route path="/hospital-signup" element={<HospitalSignupPage />} />
           <Route path="/hospital-login" element={<HospitalLoginPage />} />
+          <Route path="/hospital-admin-login" element={<HospitalAdminLoginPage />} />
           <Route
             path="/"
             element={

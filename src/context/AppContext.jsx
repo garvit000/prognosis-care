@@ -1,5 +1,6 @@
 import { createContext, useContext, useMemo, useState } from 'react';
 import { departmentList as baseDepartments, doctors as baseDoctors } from '../services/mockDoctorsData';
+import { sampleAppointments } from '../services/sampleAppointmentsData';
 import {
   createBooking,
   fetchAiRecommendations,
@@ -15,6 +16,8 @@ const DOCTORS_KEY = 'pc_doctors';
 const DEPARTMENTS_KEY = 'pc_departments';
 const DOCTORS_DATA_VERSION_KEY = 'pc_doctors_data_version';
 const DOCTORS_DATA_VERSION = '2026-02-14-image-refresh-v1';
+const APPOINTMENTS_DATA_VERSION_KEY = 'pc_appointments_data_version';
+const APPOINTMENTS_DATA_VERSION = '2026-02-15-empty-v1';
 
 const emptyPatientProfile = {
   id: 'PAT-1001',
@@ -158,12 +161,27 @@ const storedDoctors = getStoredList(DOCTORS_KEY);
 const storedDepartments = getStoredList(DEPARTMENTS_KEY);
 const storedDoctorsDataVersion = getStoredValue(DOCTORS_DATA_VERSION_KEY);
 const shouldRefreshDoctorSeed = storedDoctorsDataVersion !== DOCTORS_DATA_VERSION;
+const storedAppointmentsDataVersion = getStoredValue(APPOINTMENTS_DATA_VERSION_KEY);
+const shouldRefreshAppointmentsSeed = storedAppointmentsDataVersion !== APPOINTMENTS_DATA_VERSION;
 
 if (shouldRefreshDoctorSeed) {
   setStoredValue(DOCTORS_KEY, JSON.stringify(baseDoctors));
   setStoredValue(DEPARTMENTS_KEY, JSON.stringify(baseDepartments));
   setStoredValue(DOCTORS_DATA_VERSION_KEY, DOCTORS_DATA_VERSION);
 }
+
+// Only seed appointments if version changed (first time or data update)
+if (shouldRefreshAppointmentsSeed) {
+  setStoredValue(APPOINTMENTS_KEY, JSON.stringify([]));
+  setStoredValue(APPOINTMENTS_DATA_VERSION_KEY, APPOINTMENTS_DATA_VERSION);
+}
+
+// Use stored appointments if available (preserves cancel/complete actions), otherwise start empty
+const resolvedAppointments = shouldRefreshAppointmentsSeed
+  ? []
+  : storedAppointments.length
+    ? storedAppointments
+    : [];
 
 const initialState = {
   patient: storedProfile ? { ...emptyPatientProfile, ...storedProfile } : emptyPatientProfile,
@@ -176,7 +194,7 @@ const initialState = {
   selectedHospital: hospitals.find((hospital) => hospital.id === storedProfile?.selectedHospitalId) || hospitals[0],
   draftBooking: null,
   latestBooking: null,
-  appointments: storedAppointments,
+  appointments: resolvedAppointments,
   medicalRecords: storedMedicalRecords,
   paymentHistory: [],
   reports: [],
@@ -500,8 +518,8 @@ export function AppProvider({ children }) {
 
   const cancelAppointment = (appointmentId) => {
     setState((prev) => {
-      const nextAppointments = prev.appointments.map((appointment) =>
-        appointment.id === appointmentId ? { ...appointment, status: 'Cancelled' } : appointment
+      const nextAppointments = prev.appointments.filter((appointment) =>
+        appointment.id !== appointmentId
       );
       persistAppointments(nextAppointments);
       return {

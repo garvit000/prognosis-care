@@ -1,151 +1,460 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useApp } from '../context/AppContext';
 
 function HospitalDashboardPage() {
   const { currentUser } = useAuth();
-  const { state, addDoctor, updateDoctor, removeDoctor, updateAppointmentStatus, cancelAppointment, uploadReport } = useApp();
-  const [newDoctor, setNewDoctor] = useState({
-    fullName: '',
-    gender: 'Male',
-    department: state.departments[0] || 'General Medicine',
-    specialization: '',
-    experienceYears: 8,
-    educationShort: '',
-    mbbsInstitution: 'AIIMS New Delhi',
-    mbbsYear: '2012',
-    advancedDegree: 'MD',
-    advancedInstitution: 'CMC Vellore',
-    advancedYear: '2017',
-    consultationFee: 900,
-    languages: 'English, Hindi',
-    profileImage: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=600&q=80',
-    professionalBio: '',
-    availableTimeSlots: ['10:00 AM', '12:00 PM', '4:00 PM'],
-    weeklyAvailability: {
-      Monday: '10:00 AM - 5:00 PM',
-      Tuesday: '10:00 AM - 5:00 PM',
-      Wednesday: '10:00 AM - 5:00 PM',
-      Thursday: '10:00 AM - 5:00 PM',
-      Friday: '10:00 AM - 5:00 PM',
-      Saturday: '10:00 AM - 2:00 PM',
-      Sunday: 'Off',
-    },
-  });
-  const [reportFileName, setReportFileName] = useState('hospital-lab-report.pdf');
+  const { state, updateAppointmentStatus, cancelAppointment } = useApp();
 
-  const hospitalDoctors = useMemo(
-    () => state.doctors.filter((doctor) => doctor.hospitalId === currentUser?.hospitalId),
-    [state.doctors, currentUser?.hospitalId]
+  console.log('👨‍⚕️ Doctor Dashboard - Current User:', currentUser);
+  console.log('📋 Total Appointments in State:', state.appointments.length);
+  console.log('🔍 Filtering by doctorName:', currentUser?.doctorName);
+
+  const doctorAppointments = useMemo(
+    () => state.appointments.filter((appointment) => appointment.doctorName === currentUser?.doctorName),
+    [state.appointments, currentUser?.doctorName]
   );
 
-  const hospitalAppointments = useMemo(
-    () => state.appointments.filter((appointment) => appointment.hospital_id === currentUser?.hospitalId),
-    [state.appointments, currentUser?.hospitalId]
-  );
+  console.log('✅ Doctor Appointments Found:', doctorAppointments.length);
 
   const todayDate = new Date().toISOString().slice(0, 10);
-  const todaysAppointments = hospitalAppointments.filter((appointment) => appointment.date === todayDate);
-  const upcomingAppointments = hospitalAppointments.filter((appointment) => appointment.date >= todayDate);
+  const todaysAppointments = doctorAppointments.filter((appointment) => appointment.date === todayDate);
+  const upcomingAppointments = doctorAppointments.filter((appointment) => appointment.date >= todayDate && appointment.status !== 'Cancelled');
+  const completedAppointments = doctorAppointments.filter((appointment) => appointment.status === 'Completed');
 
-  const labTestsPending = state.latestBooking && state.latestBooking.hospital.id === currentUser?.hospitalId && state.latestBooking.reportStatus !== 'Available'
-    ? [state.latestBooking]
-    : [];
+  // Group appointments by patient to show patient progress
+  const patientGroups = useMemo(() => {
+    const groups = {};
+    doctorAppointments.forEach((appointment) => {
+      const patientKey = appointment.patientName || 'Unknown Patient';
+      if (!groups[patientKey]) {
+        groups[patientKey] = [];
+      }
+      groups[patientKey].push(appointment);
+    });
+    return groups;
+  }, [doctorAppointments]);
 
-  const revenue = hospitalAppointments
-    .filter((appointment) => appointment.status !== 'Cancelled')
-    .reduce((sum, appointment) => sum + Number(appointment.consultationFee || 0), 0);
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'Completed':
+        return 'bg-emerald-100 text-emerald-700';
+      case 'Upcoming':
+        return 'bg-blue-100 text-blue-700';
+      case 'Confirmed':
+        return 'bg-blue-100 text-blue-700';
+      case 'Cancelled':
+        return 'bg-red-100 text-red-700';
+      default:
+        return 'bg-slate-100 text-slate-700';
+    }
+  };
 
-  const handleAddDoctor = (event) => {
-    event.preventDefault();
-    addDoctor(newDoctor, currentUser.hospitalId, currentUser.hospitalName);
-    setNewDoctor((prev) => ({ ...prev, fullName: '', specialization: '', professionalBio: '' }));
+  const isToday = (dateString) => {
+    return dateString === todayDate;
+  };
+
+  // Calculate revenue from appointments
+  const totalRevenue = useMemo(() => {
+    return completedAppointments.reduce((sum, apt) => sum + (apt.consultationFee || 0), 0);
+  }, [completedAppointments]);
+
+  const potentialRevenue = useMemo(() => {
+    return upcomingAppointments.reduce((sum, apt) => sum + (apt.consultationFee || 0), 0);
+  }, [upcomingAppointments]);
+
+  const cancelledAppointments = doctorAppointments.filter((apt) => apt.status === 'Cancelled');
+  const uniquePatients = new Set(doctorAppointments.map((apt) => apt.patientName)).size;
+
+  // Group today's appointments by time for schedule view
+  const todaysSchedule = useMemo(() => {
+    return [...todaysAppointments].sort((a, b) => {
+      const timeA = a.time.toLowerCase().replace(/[^0-9:]/g, '');
+      const timeB = b.time.toLowerCase().replace(/[^0-9:]/g, '');
+      return timeA.localeCompare(timeB);
+    });
+  }, [todaysAppointments]);
+
+  const handleRefreshData = () => {
+    localStorage.clear();
+    window.location.reload();
   };
 
   return (
     <div className="page-shell space-y-4">
-      <section className="card">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-med-600">Doctor Admin Panel</p>
-        <h2 className="mt-1 text-xl font-semibold">{currentUser?.hospitalName}</h2>
-        <p className="mt-1 text-sm text-slate-600">Manage doctor operations, appointments, and lab report workflow.</p>
+      {/* Data Refresh Button */}
+      {doctorAppointments.length === 0 && (
+        <div className="card bg-yellow-50 border-yellow-300 border-2">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-bold text-yellow-900">⚠️ No Appointments Found</h3>
+              <p className="text-sm text-yellow-800 mt-1">
+                Click the button to refresh and load sample appointment data for Dr. {currentUser?.name}
+              </p>
+            </div>
+            <button
+              onClick={handleRefreshData}
+              className="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-6 rounded-lg transition-colors"
+            >
+              🔄 Refresh Data
+            </button>
+          </div>
+        </div>
+      )}
+      
+      <section className="card bg-gradient-to-r from-med-50 to-blue-50 border-med-200">
+        <div className="flex items-start justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-med-600">Doctor Dashboard</p>
+            <h2 className="mt-1 text-2xl font-bold text-med-900">{currentUser?.name}</h2>
+            <p className="mt-1 text-sm text-slate-700 font-medium">{currentUser?.department} Department</p>
+            <p className="text-sm text-slate-600">{currentUser?.hospitalName}</p>
+            <p className="mt-2 text-xs text-slate-500">
+              📧 {currentUser?.email}
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-xs text-slate-500">Today's Date</p>
+            <p className="text-sm font-semibold text-med-700">{new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
+          </div>
+        </div>
       </section>
 
-      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <article className="card"><p className="text-xs text-slate-500">Today's Appointments</p><p className="text-2xl font-bold text-med-700">{todaysAppointments.length}</p></article>
-        <article className="card"><p className="text-xs text-slate-500">Upcoming Appointments</p><p className="text-2xl font-bold text-med-700">{upcomingAppointments.length}</p></article>
-        <article className="card"><p className="text-xs text-slate-500">Lab Tests Pending</p><p className="text-2xl font-bold text-med-700">{labTestsPending.length}</p></article>
-        <article className="card"><p className="text-xs text-slate-500">Revenue Summary</p><p className="text-2xl font-bold text-med-700">₹{revenue}</p></article>
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <article className="card bg-blue-50 border-blue-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-slate-600 font-medium">Today's Schedule</p>
+              <p className="text-3xl font-bold text-blue-700 mt-1">{todaysAppointments.length}</p>
+              <p className="text-xs text-slate-500 mt-1">appointments</p>
+            </div>
+            <div className="text-4xl">📅</div>
+          </div>
+        </article>
+        <article className="card bg-emerald-50 border-emerald-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-slate-600 font-medium">Upcoming</p>
+              <p className="text-3xl font-bold text-emerald-700 mt-1">{upcomingAppointments.length}</p>
+              <p className="text-xs text-slate-500 mt-1">scheduled</p>
+            </div>
+            <div className="text-4xl">⏰</div>
+          </div>
+        </article>
+        <article className="card bg-green-50 border-green-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-slate-600 font-medium">Completed</p>
+              <p className="text-3xl font-bold text-green-700 mt-1">{completedAppointments.length}</p>
+              <p className="text-xs text-green-600 mt-1">₹{totalRevenue.toLocaleString('en-IN')}</p>
+            </div>
+            <div className="text-4xl">✅</div>
+          </div>
+        </article>
+        <article className="card bg-purple-50 border-purple-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-slate-600 font-medium">Total Patients</p>
+              <p className="text-3xl font-bold text-purple-700 mt-1">{uniquePatients}</p>
+              <p className="text-xs text-slate-500 mt-1">unique</p>
+            </div>
+            <div className="text-4xl">👥</div>
+          </div>
+        </article>
+        <article className="card bg-amber-50 border-amber-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-slate-600 font-medium">Potential Revenue</p>
+              <p className="text-2xl font-bold text-amber-700 mt-1">₹{potentialRevenue.toLocaleString('en-IN')}</p>
+              <p className="text-xs text-slate-500 mt-1">from upcoming</p>
+            </div>
+            <div className="text-4xl">💰</div>
+          </div>
+        </article>
       </section>
 
       <section className="card">
-        <h3 className="text-lg font-semibold">Add New Doctor</h3>
-        <form className="mt-3 grid gap-3 sm:grid-cols-2" onSubmit={handleAddDoctor}>
-          <input className="input" placeholder="Full Name" value={newDoctor.fullName} onChange={(e) => setNewDoctor((prev) => ({ ...prev, fullName: e.target.value }))} required />
-          <select className="input" value={newDoctor.department} onChange={(e) => setNewDoctor((prev) => ({ ...prev, department: e.target.value }))}>
-            {state.departments.map((department) => <option key={department}>{department}</option>)}
-          </select>
-          <input className="input" placeholder="Specialization" value={newDoctor.specialization} onChange={(e) => setNewDoctor((prev) => ({ ...prev, specialization: e.target.value }))} required />
-          <input className="input" placeholder="Experience (years)" type="number" min="1" value={newDoctor.experienceYears} onChange={(e) => setNewDoctor((prev) => ({ ...prev, experienceYears: e.target.value }))} required />
-          <input className="input" placeholder="Education (short)" value={newDoctor.educationShort} onChange={(e) => setNewDoctor((prev) => ({ ...prev, educationShort: e.target.value }))} required />
-          <input className="input" placeholder="Consultation Fee" type="number" min="100" value={newDoctor.consultationFee} onChange={(e) => setNewDoctor((prev) => ({ ...prev, consultationFee: e.target.value }))} required />
-          <input className="input" placeholder="Languages (comma separated)" value={newDoctor.languages} onChange={(e) => setNewDoctor((prev) => ({ ...prev, languages: e.target.value }))} required />
-          <input className="input" placeholder="Profile Photo URL" value={newDoctor.profileImage} onChange={(e) => setNewDoctor((prev) => ({ ...prev, profileImage: e.target.value }))} required />
-          <textarea className="input sm:col-span-2" placeholder="Professional Bio" value={newDoctor.professionalBio} onChange={(e) => setNewDoctor((prev) => ({ ...prev, professionalBio: e.target.value }))} required />
-          <button className="btn-primary sm:col-span-2" type="submit">Add Doctor</button>
-        </form>
-      </section>
-
-      <section className="card">
-        <h3 className="text-lg font-semibold">Doctors List</h3>
-        <div className="mt-3 space-y-2">
-          {hospitalDoctors.map((doctor) => (
-            <article key={doctor.id} className="rounded-xl border border-slate-100 p-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <p className="font-semibold">{doctor.fullName}</p>
-                  <p className="text-sm text-slate-600">{doctor.department} • ₹{doctor.consultationFee}</p>
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h3 className="text-lg font-semibold text-med-900">📋 Today's Schedule</h3>
+            <p className="text-sm text-slate-600 mt-1">{new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+          </div>
+          <div className="text-right">
+            <p className="text-xs text-slate-500">Total Consultations</p>
+            <p className="text-lg font-bold text-med-700">{todaysAppointments.length}</p>
+          </div>
+        </div>
+        {todaysSchedule.length > 0 ? (
+          <div className="space-y-3">
+            {todaysSchedule.map((appointment) => (
+              <article key={appointment.id} className="rounded-xl border-2 border-blue-200 bg-gradient-to-r from-blue-50 to-white p-4 shadow-sm hover:shadow-md transition-shadow">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-2xl">🕐</span>
+                      <p className="font-bold text-xl text-blue-900">{appointment.time}</p>
+                      <span className="rounded-full bg-blue-600 px-3 py-1 text-xs font-bold text-white">TODAY</span>
+                    </div>
+                    <div className="ml-10">
+                      <p className="font-bold text-lg text-slate-900">{appointment.patientName || 'Patient Name Not Provided'}</p>
+                      <p className="text-sm text-slate-600 mt-1">
+                        <span className="font-semibold">Patient ID:</span> {appointment.patient_id}
+                      </p>
+                      <p className="text-sm text-slate-700 mt-2 bg-amber-50 border border-amber-200 rounded-lg p-2">
+                        <span className="font-semibold text-amber-900">Chief Complaint:</span><br/>
+                        {appointment.reason}
+                      </p>
+                      {appointment.uploadedMedicalFile && (
+                        <p className="text-xs text-blue-600 mt-2 flex items-center gap-1">
+                          <span>📎</span>
+                          <span className="font-semibold">Medical File Attached:</span> {appointment.uploadedMedicalFile.fileName}
+                        </p>
+                      )}
+                      <p className="text-xs text-slate-500 mt-2">
+                        <span className="font-semibold">Fee:</span> ₹{appointment.consultationFee} • 
+                        <span className="font-semibold">Apt ID:</span> {appointment.id}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getStatusColor(appointment.status)}`}>
+                      {appointment.status}
+                    </span>
+                    {appointment.status !== 'Completed' && appointment.status !== 'Cancelled' && (
+                      <button
+                        className="btn-secondary text-xs"
+                        onClick={() => updateAppointmentStatus(appointment.id, 'Completed')}
+                      >
+                        Mark Complete
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  <button className="btn-secondary" onClick={() => updateDoctor(doctor.id, { availabilityStatus: doctor.availabilityStatus === 'Available' ? 'Fully Booked' : 'Available' })}>
-                    {doctor.availabilityStatus === 'Available' ? 'Mark Booked' : 'Mark Available'}
-                  </button>
-                  <button className="btn-secondary" onClick={() => removeDoctor(doctor.id)}>Remove</button>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-3 text-sm text-slate-500">No appointments scheduled for today.</p>
+        )}
+      </section>
+
+      <section className="card">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-lg font-semibold text-med-900">📅 All Appointments</h3>
+          <div className="flex gap-2">
+            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-semibold">
+              {upcomingAppointments.length} Upcoming
+            </span>
+            <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-semibold">
+              {completedAppointments.length} Completed
+            </span>
+          </div>
+        </div>
+        <p className="text-sm text-slate-600 mb-3">Complete history of your patient consultations</p>
+        {doctorAppointments.length > 0 ? (
+          <div className="space-y-2">
+            {doctorAppointments.map((appointment) => (
+              <article key={appointment.id} className={`rounded-lg border p-3 ${
+                appointment.status === 'Completed' ? 'bg-green-50 border-green-200' :
+                appointment.status === 'Cancelled' ? 'bg-red-50 border-red-200' :
+                isToday(appointment.date) ? 'bg-blue-50 border-blue-300 border-2' :
+                'bg-white border-slate-200'
+              }`}>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className="font-bold text-base text-slate-900">{appointment.patientName || 'Not specified'}</p>
+                      {isToday(appointment.date) && (
+                        <span className="rounded-full bg-blue-600 px-2 py-0.5 text-xs font-bold text-white">TODAY</span>
+                      )}
+                    </div>
+                    <div className="space-y-1 text-sm">
+                      <p className="text-slate-700">
+                        <span className="font-semibold">📅 Date & Time:</span> {appointment.date} at {appointment.time}
+                      </p>
+                      <p className="text-slate-700">
+                        <span className="font-semibold">👤 Patient ID:</span> {appointment.patient_id}
+                      </p>
+                      <p className="text-slate-700">
+                        <span className="font-semibold">🩺 Chief Complaint:</span> {appointment.reason}
+                      </p>
+                      <p className="text-slate-700">
+                        <span className="font-semibold">💵 Consultation Fee:</span> ₹{appointment.consultationFee}
+                      </p>
+                      {appointment.uploadedMedicalFile && (
+                        <p className="text-xs text-blue-600 flex items-center gap-1 mt-1">
+                          📎 <span className="font-semibold">Attachment:</span> {appointment.uploadedMedicalFile.fileName}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getStatusColor(appointment.status)}`}>
+                      {appointment.status}
+                    </span>
+                    {appointment.status !== 'Completed' && appointment.status !== 'Cancelled' && (
+                      <>
+                        <button
+                          className="btn-secondary text-xs"
+                          onClick={() => updateAppointmentStatus(appointment.id, 'Completed')}
+                        >
+                          Mark Complete
+                        </button>
+                        <button
+                          className="btn-secondary text-xs"
+                          onClick={() => cancelAppointment(appointment.id)}
+                        >
+                          Cancel
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-3 text-sm text-slate-500">No appointments found for this doctor.</p>
+        )}
+      </section>
+
+      <section className="card bg-gradient-to-br from-purple-50 to-pink-50 border-purple-200">
+        <h3 className="text-lg font-semibold text-purple-900 flex items-center gap-2">
+          👥 Patient Progress Tracker
+        </h3>
+        <p className="text-sm text-slate-700 mt-1 mb-4">View complete appointment history grouped by patient</p>
+        {Object.keys(patientGroups).length > 0 ? (
+          <div className="space-y-3">
+            {Object.entries(patientGroups).map(([patientName, appointments]) => {
+              const completedCount = appointments.filter(a => a.status === 'Completed').length;
+              const upcomingCount = appointments.filter(a => a.status === 'Upcoming').length;
+              const totalFees = appointments.filter(a => a.status === 'Completed').reduce((sum, a) => sum + (a.consultationFee || 0), 0);
+              
+              return (
+                <article key={patientName} className="rounded-xl border-2 border-purple-300 bg-white p-4 shadow-sm">
+                  <div className="flex items-start justify-between mb-3 pb-3 border-b border-purple-200">
+                    <div>
+                      <h4 className="font-bold text-lg text-purple-900 flex items-center gap-2">
+                        <span>👤</span>
+                        {patientName}
+                      </h4>
+                      <p className="text-xs text-slate-600 mt-1">
+                        Patient ID: {appointments[0].patient_id}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <div className="flex gap-2 mb-1">
+                        <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-semibold">
+                          {completedCount} Completed
+                        </span>
+                        <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-semibold">
+                          {upcomingCount} Upcoming
+                        </span>
+                      </div>
+                      {totalFees > 0 && (
+                        <p className="text-xs text-slate-600">
+                          Total Revenue: <span className="font-bold text-green-700">₹{totalFees.toLocaleString('en-IN')}</span>
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    {appointments.sort((a, b) => new Date(b.date) - new Date(a.date)).map((appointment) => (
+                      <div key={appointment.id} className={`rounded-lg p-3 text-sm border-l-4 ${
+                        appointment.status === 'Completed' ? 'bg-green-50 border-green-500' :
+                        appointment.status === 'Cancelled' ? 'bg-red-50 border-red-500' :
+                        'bg-blue-50 border-blue-500'
+                      }`}>
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <p className="font-semibold text-slate-900">{appointment.date}</p>
+                              <span className="text-xs text-slate-500">at {appointment.time}</span>
+                              {isToday(appointment.date) && (
+                                <span className="text-xs bg-blue-600 text-white px-2 py-0.5 rounded-full font-bold">TODAY</span>
+                              )}
+                            </div>
+                            <p className="text-slate-700 text-xs mt-1">
+                              <span className="font-semibold">Chief Complaint:</span> {appointment.reason}
+                            </p>
+                            <p className="text-slate-600 text-xs mt-1">
+                              <span className="font-semibold">Fee:</span> ₹{appointment.consultationFee} • 
+                              <span className="font-semibold"> ID:</span> {appointment.id}
+                            </p>
+                            {appointment.uploadedMedicalFile && (
+                              <p className="text-xs text-blue-600 mt-1 flex items-center gap-1">
+                                📎 {appointment.uploadedMedicalFile.fileName}
+                              </p>
+                            )}
+                          </div>
+                          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap ${getStatusColor(appointment.status)}`}>
+                            {appointment.status}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="mt-3 text-sm text-slate-500">No patient data available yet.</p>
+        )}
+      </section>
+
+      <section className="card bg-gradient-to-br from-med-50 to-purple-50 border-med-300">
+        <div className="flex items-start gap-4">
+          <div className="w-20 h-20 rounded-full bg-med-600 flex items-center justify-center text-white text-3xl font-bold">
+            {currentUser?.name?.split(' ').map(n => n[0]).join('').slice(0, 2)}
+          </div>
+          <div className="flex-1">
+            <h3 className="text-xl font-bold text-med-900">Doctor Profile</h3>
+            <div className="mt-3 grid gap-2">
+              <div className="flex items-start gap-2">
+                <span className="text-med-600 font-semibold min-w-[120px]">👨‍⚕️ Name:</span>
+                <span className="text-slate-700">{currentUser?.name}</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="text-med-600 font-semibold min-w-[120px]">🏥 Department:</span>
+                <span className="text-slate-700">{currentUser?.department}</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="text-med-600 font-semibold min-w-[120px]">🏢 Hospital:</span>
+                <span className="text-slate-700">{currentUser?.hospitalName}</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="text-med-600 font-semibold min-w-[120px]">📧 Email:</span>
+                <span className="text-slate-700">{currentUser?.email}</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="text-med-600 font-semibold min-w-[120px]">🆔 Hospital ID:</span>
+                <span className="text-slate-700">{currentUser?.hospitalId}</span>
+              </div>
+            </div>
+            <div className="mt-4 pt-4 border-t border-med-200">
+              <h4 className="font-semibold text-med-800 mb-2">📊 Performance Summary</h4>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="bg-white rounded-lg p-2 border border-med-200">
+                  <p className="text-xs text-slate-500">Total Appointments</p>
+                  <p className="text-lg font-bold text-med-700">{doctorAppointments.length}</p>
+                </div>
+                <div className="bg-white rounded-lg p-2 border border-green-200">
+                  <p className="text-xs text-slate-500">Completed</p>
+                  <p className="text-lg font-bold text-green-700">{completedAppointments.length}</p>
+                </div>
+                <div className="bg-white rounded-lg p-2 border border-red-200">
+                  <p className="text-xs text-slate-500">Cancelled</p>
+                  <p className="text-lg font-bold text-red-700">{cancelledAppointments.length}</p>
+                </div>
+                <div className="bg-white rounded-lg p-2 border border-purple-200">
+                  <p className="text-xs text-slate-500">Patients Served</p>
+                  <p className="text-lg font-bold text-purple-700">{uniquePatients}</p>
                 </div>
               </div>
-            </article>
-          ))}
+            </div>
+          </div>
         </div>
-      </section>
-
-      <section className="card">
-        <h3 className="text-lg font-semibold">Appointments</h3>
-        <div className="mt-3 space-y-2">
-          {hospitalAppointments.map((appointment) => (
-            <article key={appointment.id} className="rounded-xl border border-slate-100 p-3">
-              <p className="font-semibold">{appointment.id} • {appointment.doctorName}</p>
-              <p className="text-sm text-slate-600">{appointment.date} • {appointment.time} • {appointment.status}</p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                <button className="btn-secondary" onClick={() => updateAppointmentStatus(appointment.id, 'Completed')}>Mark Completed</button>
-                <button className="btn-secondary" onClick={() => cancelAppointment(appointment.id)}>Cancel</button>
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="card">
-        <h3 className="text-lg font-semibold">Upload Reports</h3>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <input className="input max-w-sm" value={reportFileName} onChange={(e) => setReportFileName(e.target.value)} />
-          <button className="btn-primary" onClick={() => uploadReport(reportFileName)}>Upload Report</button>
-        </div>
-      </section>
-
-      <section className="card">
-        <h3 className="text-lg font-semibold">Doctor Admin Profile Settings</h3>
-        <p className="mt-2 text-sm text-slate-600">Admin: {currentUser?.name}</p>
-        <p className="text-sm text-slate-600">Hospital ID: {currentUser?.hospitalId}</p>
-        <p className="text-sm text-slate-600">Role: Doctor Admin</p>
       </section>
     </div>
   );
