@@ -5,3 +5,6 @@ shap
 numpy
 matplotlib
 seaborn
+fastapi
+uvicorn
+python-multipart

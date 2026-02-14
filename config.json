@@ -128,5 +128,207 @@
         "Migraine": "Low",
         "Vitamin Deficiency": "Low",
         "PCOS": "Low"
+    },
+    "test_recommendations": {
+        "Cardiology": [
+            {
+                "id": "test-ecg",
+                "name": "ECG",
+                "cost": 1200,
+                "reason": "Standard cardiac assessment."
+            },
+            {
+                "id": "test-lipid",
+                "name": "Lipid Profile",
+                "cost": 1400,
+                "reason": "Check cholesterol levels."
+            },
+            {
+                "id": "test-cbc",
+                "name": "Blood Test (CBC)",
+                "cost": 750,
+                "reason": "General blood health."
+            }
+        ],
+        "Dermatology": [
+            {
+                "id": "test-skin-biopsy",
+                "name": "Skin Biopsy",
+                "cost": 2500,
+                "reason": "Microscopic examination of skin tissue."
+            },
+            {
+                "id": "test-allergy",
+                "name": "Allergy Panel",
+                "cost": 3000,
+                "reason": "Detect allergic triggers."
+            },
+            {
+                "id": "test-cbc",
+                "name": "Blood Test (CBC)",
+                "cost": 750,
+                "reason": "Check for infection signs."
+            }
+        ],
+        "Endocrinology": [
+            {
+                "id": "test-thyroid",
+                "name": "Thyroid Profile",
+                "cost": 1100,
+                "reason": "Assess thyroid function."
+            },
+            {
+                "id": "test-hba1c",
+                "name": "HbA1c",
+                "cost": 900,
+                "reason": "Diabetes screening."
+            },
+            {
+                "id": "test-lipid",
+                "name": "Lipid Profile",
+                "cost": 1400,
+                "reason": "Metabolic health check."
+            }
+        ],
+        "ENT": [
+            {
+                "id": "test-audiometry",
+                "name": "Audiometry",
+                "cost": 1500,
+                "reason": "Hearing assessment."
+            },
+            {
+                "id": "test-cbc",
+                "name": "Blood Test (CBC)",
+                "cost": 750,
+                "reason": "Check for infection."
+            },
+            {
+                "id": "test-xray-sinus",
+                "name": "X-Ray PNS",
+                "cost": 1000,
+                "reason": "Sinus visualization."
+            }
+        ],
+        "Neurology": [
+            {
+                "id": "test-mri-brain",
+                "name": "MRI Brain",
+                "cost": 6000,
+                "reason": "Detailed brain imaging."
+            },
+            {
+                "id": "test-eeg",
+                "name": "EEG",
+                "cost": 2500,
+                "reason": "Brain electrical activity."
+            },
+            {
+                "id": "test-vitamin-b12",
+                "name": "Vitamin B12",
+                "cost": 1800,
+                "reason": "Nerve health check."
+            }
+        ],
+        "Nutrition & Dietetics": [
+            {
+                "id": "test-vitamin-profile",
+                "name": "Vitamin Profile",
+                "cost": 2500,
+                "reason": "Nutritional deficiency check."
+            },
+            {
+                "id": "test-cbc",
+                "name": "Blood Test (CBC)",
+                "cost": 750,
+                "reason": "Anemia screening."
+            },
+            {
+                "id": "test-lipid",
+                "name": "Lipid Profile",
+                "cost": 1400,
+                "reason": "Dietary impact on cholesterol."
+            }
+        ],
+        "Oncology": [
+            {
+                "id": "test-pet-ct",
+                "name": "PET-CT Scan",
+                "cost": 15000,
+                "reason": "Cancer staging and detection."
+            },
+            {
+                "id": "test-cbc",
+                "name": "Blood Test (CBC)",
+                "cost": 750,
+                "reason": "General health status."
+            },
+            {
+                "id": "test-biopsy",
+                "name": "Tissue Biopsy",
+                "cost": 4000,
+                "reason": "Confirm malignancy."
+            }
+        ],
+        "Pathology": [
+            {
+                "id": "test-cbc",
+                "name": "Blood Test (CBC)",
+                "cost": 750,
+                "reason": "Basic pathology screen."
+            },
+            {
+                "id": "test-esr",
+                "name": "ESR",
+                "cost": 300,
+                "reason": "Inflammation marker."
+            },
+            {
+                "id": "test-crp",
+                "name": "CRP",
+                "cost": 600,
+                "reason": "Infection/Inflammation check."
+            }
+        ],
+        "Pulmonology": [
+            {
+                "id": "test-chest-xray",
+                "name": "Chest X-Ray",
+                "cost": 950,
+                "reason": "Lung imaging."
+            },
+            {
+                "id": "test-pft",
+                "name": "PFT",
+                "cost": 1500,
+                "reason": "Lung function test."
+            },
+            {
+                "id": "test-abg",
+                "name": "Arterial Blood Gas",
+                "cost": 1800,
+                "reason": "Oxygen/CO2 levels."
+            }
+        ],
+        "General Medicine": [
+            {
+                "id": "test-cbc",
+                "name": "Blood Test (CBC)",
+                "cost": 750,
+                "reason": "General health check."
+            },
+            {
+                "id": "test-lft",
+                "name": "Liver Function Test",
+                "cost": 1300,
+                "reason": "Liver health."
+            },
+            {
+                "id": "test-kft",
+                "name": "Kidney Function Test",
+                "cost": 1400,
+                "reason": "Kidney health."
+            }
+        ]
     }
 }

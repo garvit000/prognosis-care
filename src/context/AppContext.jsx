@@ -8,6 +8,7 @@ import {
   uploadReportMock,
 } from '../services/mockApi';
 import { fetchGeminiRecommendations } from '../services/geminiService';
+import { fetchPrediction } from '../services/predictionService';
 
 const AppContext = createContext(null);
 const PATIENT_PROFILE_KEY = 'pc_patient_profile';
@@ -486,10 +487,10 @@ export function AppProvider({ children }) {
       createdAt: new Date().toISOString(),
       uploadedMedicalFile: file
         ? {
-            fileName: file.name,
-            mimeType: file.type,
-            previewUrl: filePreview,
-          }
+          fileName: file.name,
+          mimeType: file.type,
+          previewUrl: filePreview,
+        }
         : null,
     };
 
@@ -561,11 +562,24 @@ export function AppProvider({ children }) {
 
     let data;
     try {
-      // Call Gemini AI with the actual symptoms
-      data = await fetchGeminiRecommendations(cleanSymptoms);
-    } catch (err) {
-      console.warn('Gemini API failed, falling back to mock data:', err.message);
-      data = await fetchAiRecommendations();
+      // 1. Try Local Backend (Our trained model)
+      console.log('Fetching from Local Backend...');
+      const backendResponse = await fetchPrediction(cleanSymptoms);
+      // Map backend response to shape expected by UI
+      data = {
+        summary: backendResponse.summary,
+        tests: backendResponse.tests.map(t => ({ ...t, priority: 'high' })) // default priority
+      };
+    } catch (backendErr) {
+      console.warn('Backend failed, trying Gemini:', backendErr);
+      try {
+        // 2. Try Gemini API
+        data = await fetchGeminiRecommendations(cleanSymptoms);
+      } catch (geminiErr) {
+        console.warn('Gemini API failed, falling back to mock data:', geminiErr.message);
+        // 3. Fallback to Mock
+        data = await fetchAiRecommendations();
+      }
     }
 
     setState((prev) => ({
