@@ -1,6 +1,18 @@
 import { useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
+import {
+  Building2,
+  Mail,
+  Lock,
+  Eye,
+  EyeOff,
+  ArrowRight,
+  Activity,
+  BarChart3,
+  AlertCircle
+} from 'lucide-react';
 
 function HospitalAdminLoginPage() {
   const { currentUser, hospitalAdminLogin, getRoleHomeRoute } = useAuth();
@@ -30,86 +42,163 @@ function HospitalAdminLoginPage() {
   };
 
   return (
-    <div className="auth-shell">
-      <div className="auth-split">
-        <aside className="auth-brand-panel animate-fadeIn">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-blue-100">Hospital Admin Access</p>
-            <h1 className="mt-3 text-4xl font-bold leading-tight">Hospital Management</h1>
-            <p className="mt-4 max-w-md text-blue-100/90">
-              Manage your hospital profile, doctors, and appointments from a single dashboard.
-            </p>
-          </div>
-          <div className="rounded-2xl border border-white/30 bg-white/10 p-4 text-sm text-blue-50 shadow-lg">
-            Hospital Administration • Staff Management • Analytics
-          </div>
-        </aside>
+    <div className="min-h-screen flex bg-white">
+      {/* Left Panel - Brand (Blue Theme) */}
+      <div className="hidden lg:flex w-1/2 bg-slate-900 relative overflow-hidden items-center justify-center p-12">
+        <motion.div
+          animate={{ scale: [1, 1.1, 1], rotate: [0, 5, -5, 0] }}
+          transition={{ duration: 20, repeat: Infinity, repeatType: "reverse" }}
+          className="absolute inset-0 opacity-40 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-blue-700 via-slate-900 to-slate-900"
+        ></motion.div>
 
-        <section className="auth-form-wrap animate-fadeIn">
-          <div className="auth-glass-card">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-med-600">Admin Portal</p>
-            <h2 className="mt-1 text-3xl font-bold text-slate-900">Hospital Login</h2>
-            <p className="mt-2 text-sm text-slate-600">Sign in to manage your hospital operations.</p>
+        <div className="relative z-10 max-w-lg text-white">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="flex items-center gap-3 mb-8"
+          >
+            <div className="bg-white/10 backdrop-blur-md p-3 rounded-xl border border-white/10">
+              <Building2 className="w-8 h-8 text-blue-400" />
+            </div>
+            <span className="text-2xl font-bold tracking-tight">Prognosis Care</span>
+          </motion.div>
 
-            <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
-              <div className="floating-field">
-                <input
-                  type="email"
-                  className="floating-input"
-                  placeholder="Email"
-                  value={form.email}
-                  onChange={(event) => setForm((prev) => ({ ...prev, email: event.target.value }))}
-                />
-                <span className="floating-label">Email</span>
+          <motion.h1
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="text-5xl font-bold leading-tight mb-6"
+          >
+            Hospital Admin <br />
+            <span className="text-blue-400">Dashboard</span>
+          </motion.h1>
+
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            className="text-blue-100/70 text-lg mb-8 leading-relaxed"
+          >
+            Streamline operations, manage specialist rosters, and analyze performance metrics.
+          </motion.p>
+
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.6 }}
+            className="flex flex-wrap gap-3"
+          >
+            <div className="flex items-center gap-2 bg-white/5 border border-white/10 px-4 py-2 rounded-lg text-sm text-slate-300">
+              <Activity className="w-4 h-4 text-blue-400" />
+              Operations
+            </div>
+            <div className="flex items-center gap-2 bg-white/5 border border-white/10 px-4 py-2 rounded-lg text-sm text-slate-300">
+              <BarChart3 className="w-4 h-4 text-emerald-400" />
+              Analytics
+            </div>
+          </motion.div>
+        </div>
+      </div>
+
+      {/* Right Panel - Login Form */}
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-slate-50">
+        <div className="w-full max-w-md bg-white p-8 sm:p-10 rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100">
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            <div className="mb-8">
+              <Link to="/auth" className="text-xs font-semibold text-blue-600 tracking-wider uppercase mb-2 inline-block hover:underline">
+                ← Back to Options
+              </Link>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="p-1 px-2 rounded bg-blue-100 text-blue-700 text-xs font-bold uppercase">Administration</span>
               </div>
+              <h2 className="text-3xl font-bold text-slate-900">Hospital Login</h2>
+              <p className="text-slate-500 mt-2">Sign in to manage your facility.</p>
+            </div>
 
-              <div className="floating-field">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  className="floating-input pr-12"
-                  placeholder="Password"
-                  value={form.password}
-                  onChange={(event) => setForm((prev) => ({ ...prev, password: event.target.value }))}
-                />
-                <span className="floating-label">Password</span>
-                <button
-                  type="button"
-                  className="absolute right-3 top-3 text-xs font-semibold text-med-700"
-                  onClick={() => setShowPassword((prev) => !prev)}
+            <AnimatePresence>
+              {error && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="mb-6 p-4 rounded-xl text-sm font-medium bg-red-50 text-red-700 border border-red-100 flex items-start gap-3"
                 >
-                  {showPassword ? 'Hide' : 'Show'}
-                </button>
+                  <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                  {error}
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold text-slate-700">Work Email</label>
+                <div className="relative">
+                  <Mail className="absolute left-3.5 top-3.5 h-5 w-5 text-slate-400" />
+                  <input
+                    type="email"
+                    value={form.email}
+                    onChange={(e) => setForm({ ...form, email: e.target.value })}
+                    className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100 transition-all outline-none text-slate-900 placeholder:text-slate-400"
+                    placeholder="admin@hospital.com"
+                  />
+                </div>
               </div>
 
-              {error ? <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p> : null}
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold text-slate-700">Password</label>
+                <div className="relative">
+                  <Lock className="absolute left-3.5 top-3.5 h-5 w-5 text-slate-400" />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={form.password}
+                    onChange={(e) => setForm({ ...form, password: e.target.value })}
+                    className="w-full pl-11 pr-12 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100 transition-all outline-none text-slate-900 placeholder:text-slate-400"
+                    placeholder="Enter your password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3.5 top-3.5 text-slate-400 hover:text-slate-600 transition-colors"
+                  >
+                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                  </button>
+                </div>
+              </div>
 
-              <button className="btn-primary w-full" type="submit" disabled={loading}>
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full flex items-center justify-center gap-2 py-3.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl shadow-lg shadow-blue-600/20 hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 transition-all disabled:opacity-70 disabled:cursor-not-allowed"
+              >
                 {loading ? (
-                  <span className="inline-flex items-center gap-2">
-                    <span className="spinner" /> Signing in...
-                  </span>
+                  <>
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Signing in...</span>
+                  </>
                 ) : (
-                  'Login'
+                  <>
+                    Admin Login
+                    <ArrowRight className="w-5 h-5" />
+                  </>
                 )}
               </button>
             </form>
 
-            <div className="mt-5 border-t border-slate-200 pt-4 text-sm text-slate-600">
-              <p>
+            <div className="mt-8 pt-8 border-t border-slate-100 text-center">
+              <p className="text-slate-500 text-sm">
                 New hospital?{' '}
-                <Link className="font-semibold text-med-700 transition hover:opacity-80" to="/hospital-signup">
+                <Link to="/hospital-signup" className="font-semibold text-blue-600 hover:text-blue-700 transition-colors">
                   Register here
                 </Link>
               </p>
-              <p className="mt-2 text-xs text-slate-500">
-                Are you a doctor?{' '}
-                <Link className="font-semibold text-med-700 transition hover:opacity-80" to="/doctor-login">
-                  Go to Doctor Login
-                </Link>
-              </p>
             </div>
-          </div>
-        </section>
+          </motion.div>
+        </div>
       </div>
     </div>
   );

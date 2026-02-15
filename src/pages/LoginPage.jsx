@@ -143,6 +143,9 @@ function LoginPage() {
             transition={{ duration: 0.5 }}
           >
             <div className="mb-8">
+              <Link to="/auth" className="text-xs font-semibold text-slate-500 tracking-wider uppercase mb-2 inline-block hover:underline hover:text-med-600 transition-colors">
+                ← Back to Options
+              </Link>
               <h2 className="text-3xl font-bold text-slate-900">Welcome back</h2>
               <p className="text-slate-500 mt-2">Please enter your details to sign in.</p>
             </div>
@@ -154,8 +157,8 @@ function LoginPage() {
                   animate={{ opacity: 1, height: 'auto' }}
                   exit={{ opacity: 0, height: 0 }}
                   className={`mb-6 p-4 rounded-xl text-sm font-medium ${error || toast.type === 'error'
-                      ? 'bg-red-50 text-red-700 border border-red-100'
-                      : 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                    ? 'bg-red-50 text-red-700 border border-red-100'
+                    : 'bg-emerald-50 text-emerald-700 border border-emerald-100'
                     }`}
                 >
                   {error || toast.message}
