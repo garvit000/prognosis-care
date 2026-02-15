@@ -1,4 +1,13 @@
-import { createContext, useContext, useMemo, useState } from 'react';
+import { createContext, useContext, useMemo, useState, useEffect } from 'react';
+import {
+  collection,
+  onSnapshot,
+  doc,
+  setDoc,
+  updateDoc,
+  deleteDoc
+} from 'firebase/firestore';
+import { db } from '../services/firebase';
 import { departmentList as baseDepartments, doctors as baseDoctors } from '../services/mockDoctorsData';
 import { sampleAppointments } from '../services/sampleAppointmentsData';
 import {
@@ -262,6 +271,30 @@ export function AppProvider({ children }) {
   });
   const [paymentError, setPaymentError] = useState('');
 
+  // ─── Firestore Sync ───
+  useEffect(() => {
+    if (!db) return;
+
+    const unsubscribe = onSnapshot(collection(db, 'appointments'), (snapshot) => {
+      const liveAppointments = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+
+      setState((prev) => {
+        // Merge live appointments with mock/local ones if needed, or replacement?
+        // For distinct sync, we should probably replace the appointments list with the source of truth.
+        // However, we might lose "local" appointments if we just replace.
+        // Given the goal is "sync", let's trust Firestore as the comprehensive list for appointments.
+        return {
+          ...prev,
+          appointments: liveAppointments,
+        };
+      });
+    }, (error) => {
+      console.error("Firestore sync error:", error);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
   const updatePatientProfile = (profileInput) => {
     const riskLevel = inferRiskLevelFromBp(profileInput.bp);
     const selectedHospital = hospitals.find((hospital) => hospital.id === profileInput.selectedHospitalId) || hospitals[0];
@@ -497,14 +530,26 @@ export function AppProvider({ children }) {
         : null,
     };
 
-    setState((prev) => {
-      const nextAppointments = [appointment, ...prev.appointments];
-      persistAppointments(nextAppointments);
-      return {
-        ...prev,
-        appointments: nextAppointments,
-      };
-    });
+    if (db) {
+      // Write to Firestore
+      try {
+        await setDoc(doc(db, 'appointments', appointment.id), appointment);
+        // State update handled by listener
+      } catch (e) {
+        console.error("Error adding appointment to DB:", e);
+        // Fallback to local state if DB write fails?
+      }
+    } else {
+      // Fallback: Local Storage
+      setState((prev) => {
+        const nextAppointments = [appointment, ...prev.appointments];
+        persistAppointments(nextAppointments);
+        return {
+          ...prev,
+          appointments: nextAppointments,
+        };
+      });
+    }
 
     if (file) {
       await addMedicalRecord({
@@ -522,30 +567,38 @@ export function AppProvider({ children }) {
   };
 
   const cancelAppointment = (appointmentId) => {
-    setState((prev) => {
-      const nextAppointments = prev.appointments.filter((appointment) =>
-        appointment.id !== appointmentId
-      );
-      persistAppointments(nextAppointments);
-      return {
-        ...prev,
-        appointments: nextAppointments,
-      };
-    });
+    if (db) {
+      deleteDoc(doc(db, 'appointments', appointmentId)).catch(console.error);
+    } else {
+      setState((prev) => {
+        const nextAppointments = prev.appointments.filter((appointment) =>
+          appointment.id !== appointmentId
+        );
+        persistAppointments(nextAppointments);
+        return {
+          ...prev,
+          appointments: nextAppointments,
+        };
+      });
+    }
     pushNotification('Appointment cancelled.');
   };
 
   const updateAppointmentStatus = (appointmentId, status) => {
-    setState((prev) => {
-      const nextAppointments = prev.appointments.map((appointment) =>
-        appointment.id === appointmentId ? { ...appointment, status } : appointment
-      );
-      persistAppointments(nextAppointments);
-      return {
-        ...prev,
-        appointments: nextAppointments,
-      };
-    });
+    if (db) {
+      updateDoc(doc(db, 'appointments', appointmentId), { status }).catch(console.error);
+    } else {
+      setState((prev) => {
+        const nextAppointments = prev.appointments.map((appointment) =>
+          appointment.id === appointmentId ? { ...appointment, status } : appointment
+        );
+        persistAppointments(nextAppointments);
+        return {
+          ...prev,
+          appointments: nextAppointments,
+        };
+      });
+    }
     pushNotification(`Appointment marked as ${status}.`);
   };
 

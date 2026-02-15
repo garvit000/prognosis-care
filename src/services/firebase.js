@@ -1,5 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
+import { getFirestore } from 'firebase/firestore';
 
 // Firebase configuration is loaded from Vite environment variables.
 const firebaseConfig = {
@@ -20,12 +21,14 @@ export const firebaseConfigError = isFirebaseConfigured
   : `Missing Firebase env keys: ${missingKeys.join(', ')}`;
 
 let auth = null;
+let db = null;
 
 if (isFirebaseConfigured) {
   const app = initializeApp(firebaseConfig);
   auth = getAuth(app);
+  db = getFirestore(app);
 } else {
   console.warn(`[Auth] Firebase not configured. Falling back to local mock auth. ${firebaseConfigError}`);
 }
 
-export { auth };
+export { auth, db };

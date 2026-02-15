@@ -47,6 +47,12 @@ function TriagePage() {
       console.error('Speech recognition error:', event.error);
       if (event.error === 'not-allowed') {
         setError('Microphone access denied. Please allow microphone permission.');
+      } else if (event.error === 'network') {
+        setError('Voice recognition requires an internet connection. Please type your symptoms.');
+      } else if (event.error === 'no-speech') {
+        // Ignore no-speech, just stop listening
+      } else {
+        setError(`Voice recognition error: ${event.error}. Please type your symptoms.`);
       }
       setIsListening(false);
       setInterimText('');
@@ -110,11 +116,10 @@ function TriagePage() {
                 type="button"
                 onClick={toggleListening}
                 title={isListening ? 'Stop listening' : 'Start voice input'}
-                className={`absolute right-2 top-2 flex h-10 w-10 items-center justify-center rounded-full transition-all duration-200 ${
-                  isListening
+                className={`absolute right-2 top-2 flex h-10 w-10 items-center justify-center rounded-full transition-all duration-200 ${isListening
                     ? 'bg-red-500 text-white shadow-lg shadow-red-200 animate-pulse'
                     : 'bg-med-100 text-med-700 hover:bg-med-200'
-                }`}
+                  }`}
               >
                 {isListening ? (
                   /* stop icon */
@@ -160,11 +165,10 @@ function TriagePage() {
             <button
               type="button"
               onClick={toggleListening}
-              className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all duration-200 ${
-                isListening
+              className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all duration-200 ${isListening
                   ? 'bg-red-100 text-red-700 hover:bg-red-200'
                   : 'bg-med-50 text-med-700 border border-med-300 hover:bg-med-100'
-              }`}
+                }`}
             >
               {isListening ? '⏹ Stop Recording' : '🎙️ Voice Input'}
             </button>
