@@ -5,9 +5,12 @@ import {
   doc,
   setDoc,
   updateDoc,
-  deleteDoc
+  deleteDoc,
+  query,
+  where
 } from 'firebase/firestore';
 import { db } from '../services/firebase';
+import { useAuth } from './AuthContext';
 import { departmentList as baseDepartments, doctors as baseDoctors } from '../services/mockDoctorsData';
 import { sampleAppointments } from '../services/sampleAppointmentsData';
 import {
@@ -23,9 +26,13 @@ import {
 import { fetchPrediction } from '../services/predictionService';
 
 const AppContext = createContext(null);
+
+// Keys (prefixes)
 const PATIENT_PROFILE_KEY = 'pc_patient_profile';
 const APPOINTMENTS_KEY = 'pc_appointments';
 const MEDICAL_RECORDS_KEY = 'pc_medical_records';
+
+// Global keys (not user-specific)
 const DOCTORS_KEY = 'pc_doctors';
 const DEPARTMENTS_KEY = 'pc_departments';
 const DOCTORS_DATA_VERSION_KEY = 'pc_doctors_data_version';
@@ -46,25 +53,6 @@ const emptyPatientProfile = {
   bp: '',
 };
 
-function getStoredPatientProfile() {
-  try {
-    const saved = localStorage.getItem(PATIENT_PROFILE_KEY);
-    if (!saved) return null;
-    return JSON.parse(saved);
-  } catch {
-    return null;
-  }
-}
-
-function getStoredList(key) {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-}
-
 function getStoredValue(key) {
   try {
     return localStorage.getItem(key);
@@ -77,7 +65,16 @@ function setStoredValue(key, value) {
   try {
     localStorage.setItem(key, value);
   } catch {
-    // no-op when storage access is blocked
+    // no-op
+  }
+}
+
+function getStoredList(key) {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
   }
 }
 
@@ -168,52 +165,23 @@ const hospitals = [
   },
 ];
 
-const storedProfile = getStoredPatientProfile();
-const storedAppointments = getStoredList(APPOINTMENTS_KEY);
-const storedMedicalRecords = getStoredList(MEDICAL_RECORDS_KEY);
-const storedDoctors = getStoredList(DOCTORS_KEY);
-const storedDepartments = getStoredList(DEPARTMENTS_KEY);
-const storedDoctorsDataVersion = getStoredValue(DOCTORS_DATA_VERSION_KEY);
-const shouldRefreshDoctorSeed = storedDoctorsDataVersion !== DOCTORS_DATA_VERSION;
-const storedAppointmentsDataVersion = getStoredValue(APPOINTMENTS_DATA_VERSION_KEY);
-const shouldRefreshAppointmentsSeed = storedAppointmentsDataVersion !== APPOINTMENTS_DATA_VERSION;
-
-if (shouldRefreshDoctorSeed) {
-  setStoredValue(DOCTORS_KEY, JSON.stringify(baseDoctors));
-  setStoredValue(DEPARTMENTS_KEY, JSON.stringify(baseDepartments));
-  setStoredValue(DOCTORS_DATA_VERSION_KEY, DOCTORS_DATA_VERSION);
-}
-
-// Only seed appointments if version changed (first time or data update)
-if (shouldRefreshAppointmentsSeed) {
-  setStoredValue(APPOINTMENTS_KEY, JSON.stringify([]));
-  setStoredValue(APPOINTMENTS_DATA_VERSION_KEY, APPOINTMENTS_DATA_VERSION);
-}
-
-// Use stored appointments if available (preserves cancel/complete actions), otherwise start empty
-const resolvedAppointments = shouldRefreshAppointmentsSeed
-  ? []
-  : storedAppointments.length
-    ? storedAppointments
-    : [];
-
-const initialState = {
-  patient: storedProfile ? { ...emptyPatientProfile, ...storedProfile } : emptyPatientProfile,
-  profileCompleted: Boolean(storedProfile?.name && storedProfile?.dob),
+// Initial state template
+const baseInitialState = {
+  patient: emptyPatientProfile,
+  profileCompleted: false,
   patientSymptoms: '',
   recommendedTests: [],
   recommendationSummary: '',
-  doctors: shouldRefreshDoctorSeed ? baseDoctors : storedDoctors.length ? storedDoctors : baseDoctors,
-  departments: shouldRefreshDoctorSeed ? baseDepartments : storedDepartments.length ? storedDepartments : baseDepartments,
-  selectedHospital: hospitals.find((hospital) => hospital.id === storedProfile?.selectedHospitalId) || hospitals[0],
+  doctors: baseDoctors,
+  departments: baseDepartments,
+  selectedHospital: hospitals[0],
   draftBooking: null,
   latestBooking: null,
-  appointments: resolvedAppointments,
-  medicalRecords: storedMedicalRecords,
+  appointments: [],
+  medicalRecords: [],
   paymentHistory: [],
   reports: [],
   notifications: [],
-  // Hackathon AI Fields
   aiRiskLevel: 'Low',
   aiConfidenceScore: 0,
   aiRecommendedDepartment: 'General Medicine',
@@ -266,7 +234,8 @@ function composeDraftBooking(state, { location, slot, insuranceEnabled }) {
 }
 
 export function AppProvider({ children }) {
-  const [state, setState] = useState(initialState);
+  const { currentUser } = useAuth();
+  const [state, setState] = useState(baseInitialState);
   const [loading, setLoading] = useState({
     recommendations: false,
     booking: false,
@@ -276,18 +245,81 @@ export function AppProvider({ children }) {
   });
   const [paymentError, setPaymentError] = useState('');
 
-  // ─── Firestore Sync ───
+  // Hydrate state from LocalStorage based on currentUser
   useEffect(() => {
-    if (!db) return;
+    if (!currentUser) {
+      // Reset to base state if no user
+      setState(baseInitialState);
+      return;
+    }
 
-    const unsubscribe = onSnapshot(collection(db, 'appointments'), (snapshot) => {
+    const userId = currentUser.id;
+    const userProfileKey = `${PATIENT_PROFILE_KEY}_${userId}`;
+    const userAppointmentsKey = `${APPOINTMENTS_KEY}_${userId}`;
+    const userRecordsKey = `${MEDICAL_RECORDS_KEY}_${userId}`;
+
+    // Load global data first
+    const storedDoctors = getStoredList(DOCTORS_KEY);
+    const storedDepartments = getStoredList(DEPARTMENTS_KEY);
+    const storedDoctorsDataVersion = getStoredValue(DOCTORS_DATA_VERSION_KEY);
+
+    // Seed global doctors if version mismatch
+    const shouldRefreshDoctorSeed = storedDoctorsDataVersion !== DOCTORS_DATA_VERSION;
+    if (shouldRefreshDoctorSeed) {
+      setStoredValue(DOCTORS_KEY, JSON.stringify(baseDoctors));
+      setStoredValue(DEPARTMENTS_KEY, JSON.stringify(baseDepartments));
+      setStoredValue(DOCTORS_DATA_VERSION_KEY, DOCTORS_DATA_VERSION);
+    }
+
+    // Load User Data
+    const storedProfile = getStoredList(userProfileKey);
+    // Wait, getStoredList returns [], but getStoredValue returns string/null.
+    // Profile is object. Let's fix manual parsing here for profile.
+    let userProfile = null;
+    try {
+      const raw = localStorage.getItem(userProfileKey);
+      if (raw) userProfile = JSON.parse(raw);
+    } catch { }
+
+    const userAppointments = getStoredList(userAppointmentsKey);
+    const userRecords = getStoredList(userRecordsKey);
+
+    const initialPatient = userProfile
+      ? { ...emptyPatientProfile, ...userProfile, id: userId, name: userProfile.name || currentUser.name || '' }
+      : { ...emptyPatientProfile, id: userId, name: currentUser.name || '' };
+
+    const selectedHospital = hospitals.find((h) => h.id === initialPatient.selectedHospitalId) || hospitals[0];
+
+    setState(prev => ({
+      ...prev,
+      patient: initialPatient,
+      profileCompleted: Boolean(initialPatient.name && initialPatient.dob),
+      appointments: userAppointments,
+      medicalRecords: userRecords,
+      doctors: shouldRefreshDoctorSeed ? baseDoctors : (storedDoctors.length ? storedDoctors : baseDoctors),
+      departments: shouldRefreshDoctorSeed ? baseDepartments : (storedDepartments.length ? storedDepartments : baseDepartments),
+      selectedHospital,
+      // Reset transactional state
+      draftBooking: null,
+      latestBooking: null,
+      paymentHistory: [],
+      reports: [],
+      notifications: [],
+    }));
+
+  }, [currentUser]); // Depend only on currentUser
+
+  // ─── Firestore Sync (Filtered by User) ───
+  useEffect(() => {
+    if (!db || !currentUser) return;
+
+    // Filter appointments for THIS patient only
+    const q = query(collection(db, 'appointments'), where('patient_id', '==', currentUser.id));
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
       const liveAppointments = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 
       setState((prev) => {
-        // Merge live appointments with mock/local ones if needed, or replacement?
-        // For distinct sync, we should probably replace the appointments list with the source of truth.
-        // However, we might lose "local" appointments if we just replace.
-        // Given the goal is "sync", let's trust Firestore as the comprehensive list for appointments.
         return {
           ...prev,
           appointments: liveAppointments,
@@ -298,7 +330,12 @@ export function AppProvider({ children }) {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [currentUser]); // Re-subscribe when user changes
+
+  // Helper to get user-specific key
+  const getUserKey = (baseKey) => {
+    return currentUser ? `${baseKey}_${currentUser.id}` : baseKey;
+  };
 
   const updatePatientProfile = (profileInput) => {
     const riskLevel = inferRiskLevelFromBp(profileInput.bp);
@@ -310,7 +347,9 @@ export function AppProvider({ children }) {
       selectedHospitalId: selectedHospital.id,
     };
 
-    localStorage.setItem(PATIENT_PROFILE_KEY, JSON.stringify(nextPatient));
+    if (currentUser) {
+      setStoredValue(getUserKey(PATIENT_PROFILE_KEY), JSON.stringify(nextPatient));
+    }
 
     setState((prev) => ({
       ...prev,
@@ -329,7 +368,9 @@ export function AppProvider({ children }) {
         selectedHospitalId: selectedHospital.id,
       };
 
-      localStorage.setItem(PATIENT_PROFILE_KEY, JSON.stringify(nextPatient));
+      if (currentUser) {
+        setStoredValue(getUserKey(PATIENT_PROFILE_KEY), JSON.stringify(nextPatient));
+      }
 
       return {
         ...prev,
@@ -347,19 +388,23 @@ export function AppProvider({ children }) {
   };
 
   const persistDoctors = (doctorsList) => {
-    localStorage.setItem(DOCTORS_KEY, JSON.stringify(doctorsList));
+    setStoredValue(DOCTORS_KEY, JSON.stringify(doctorsList));
   };
 
   const persistDepartments = (departmentsList) => {
-    localStorage.setItem(DEPARTMENTS_KEY, JSON.stringify(departmentsList));
+    setStoredValue(DEPARTMENTS_KEY, JSON.stringify(departmentsList));
   };
 
   const persistAppointments = (appointments) => {
-    localStorage.setItem(APPOINTMENTS_KEY, JSON.stringify(appointments));
+    if (currentUser) {
+      setStoredValue(getUserKey(APPOINTMENTS_KEY), JSON.stringify(appointments));
+    }
   };
 
   const persistMedicalRecords = (records) => {
-    localStorage.setItem(MEDICAL_RECORDS_KEY, JSON.stringify(records));
+    if (currentUser) {
+      setStoredValue(getUserKey(MEDICAL_RECORDS_KEY), JSON.stringify(records));
+    }
   };
 
   const addMedicalRecord = async ({ file, recordType, notes, appointmentId, doctorName }) => {
@@ -517,7 +562,7 @@ export function AppProvider({ children }) {
 
     const appointment = {
       id: appointmentId,
-      patient_id: state.patient.id,
+      patient_id: state.patient.id, // Ensure this uses the current user ID from state
       patientName: patientDisplayName,
       doctor_id: doctor.id,
       hospital_id: doctor.hospitalId || 'hosp-1',
@@ -545,13 +590,12 @@ export function AppProvider({ children }) {
       // Write to Firestore
       try {
         await setDoc(doc(db, 'appointments', appointment.id), appointment);
-        // State update handled by listener
+        // State update handled by listener (which is now filtered)
       } catch (e) {
         console.error("Error adding appointment to DB:", e);
-        // Fallback to local state if DB write fails?
       }
     } else {
-      // Fallback: Local Storage
+      // Fallback: Local Storage (Filtered Key)
       setState((prev) => {
         const nextAppointments = [appointment, ...prev.appointments];
         persistAppointments(nextAppointments);
@@ -650,7 +694,6 @@ export function AppProvider({ children }) {
 
     let data;
     try {
-      // 1. Primary: Gemini (user-requested AI assistant behavior)
       data = await fetchGeminiRecommendations(cleanSymptoms);
 
       if (data?.isHealthRelated === false) {
@@ -662,7 +705,6 @@ export function AppProvider({ children }) {
     } catch (geminiErr) {
       console.warn('Gemini failed, trying local backend:', geminiErr);
       try {
-        // 2. Fallback: local backend model
         const backendResponse = await fetchPrediction(cleanSymptoms);
         data = {
           summary: backendResponse.summary,
@@ -682,7 +724,6 @@ export function AppProvider({ children }) {
       patientSymptoms: cleanSymptoms,
       recommendedTests: data.tests,
       recommendationSummary: data.summary,
-      // Hackathon: New fields
       aiRiskLevel: data.riskLevel || 'Low',
       aiConfidenceScore: data.confidenceScore || 0,
       aiRecommendedDepartment: data.recommendedDepartment || 'General Medicine',
@@ -883,6 +924,7 @@ export function AppProvider({ children }) {
       deleteMedicalRecord,
       pushNotification,
       loadRecommendations,
+      analyzeWithDocs,
       saveDraftBooking,
       confirmBooking,
       payForBooking,
