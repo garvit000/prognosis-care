@@ -75,14 +75,10 @@ export function AuthProvider({ children }) {
     if (!isFirebaseConfigured || !auth) {
       userData = { uid: `patient-${Date.now()}`, email };
     } else {
-      try {
-        const response = await createUserWithEmailAndPassword(auth, email, password);
-        userData = response.user;
-      } catch (firebaseError) {
-        // Fall back to mock auth if Firebase fails
-        console.warn('[Auth] Firebase signup failed, using mock auth:', firebaseError.code);
-        userData = { uid: `patient-${Date.now()}`, email };
-      }
+      // Real Firebase Auth
+      const response = await createUserWithEmailAndPassword(auth, email, password);
+      userData = response.user;
+      // Let errors propagate (e.g., email-already-in-use)
     }
 
     const session = {
@@ -103,16 +99,14 @@ export function AuthProvider({ children }) {
   const login = async (email, password) => {
     let userData;
     if (!isFirebaseConfigured || !auth) {
+      // Only use mock auth if Firebase is deliberately not configured
+      console.warn('[Auth] Firebase not configured. Using mock auth.');
       userData = { uid: `patient-${Date.now()}`, email };
     } else {
-      try {
-        const response = await signInWithEmailAndPassword(auth, email, password);
-        userData = response.user;
-      } catch (firebaseError) {
-        // Fall back to mock auth if Firebase fails (for testing/demo purposes)
-        console.warn('[Auth] Firebase login failed, using mock auth:', firebaseError.code);
-        userData = { uid: `patient-${Date.now()}`, email };
-      }
+      // Real Firebase Auth
+      const response = await signInWithEmailAndPassword(auth, email, password);
+      userData = response.user;
+      // No catch block here - let Firebase errors (wrong-password, user-not-found) propagate to the UI
     }
 
     const session = {
