@@ -91,8 +91,8 @@ function LoginPage() {
             transition={{ delay: 0.2 }}
             className="flex items-center gap-3 mb-8"
           >
-            <div className="bg-white/10 backdrop-blur-md p-3 rounded-xl border border-white/10">
-              <Activity className="w-8 h-8 text-med-400" />
+            <div className="bg-white/10 backdrop-blur-md p-3 rounded-xl border border-white/10 overflow-hidden w-16 h-16 flex items-center justify-center">
+              <img src="/images/logo.jpeg" alt="Logo" className="w-full h-full object-cover rounded-lg" />
             </div>
             <span className="text-2xl font-bold tracking-tight">Prognosis Care</span>
           </motion.div>

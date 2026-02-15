@@ -2,16 +2,16 @@ import { useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import { gsap } from 'gsap';
-import { 
-  Bot, 
-  Stethoscope, 
-  CalendarCheck, 
-  Building2, 
-  FileText, 
-  MessageCircle, 
-  ArrowRight, 
-  Activity, 
-  CheckCircle2 
+import {
+  Bot,
+  Stethoscope,
+  CalendarCheck,
+  Building2,
+  FileText,
+  MessageCircle,
+  ArrowRight,
+  Activity,
+  CheckCircle2
 } from 'lucide-react';
 import { contractHospitals, contractDepartments } from '../services/contractHospitalData';
 
@@ -73,17 +73,17 @@ function HomePage() {
   const hospitalFacilities = [
     {
       hospital: 'Max Hospital',
-      color: 'from-blue-600 to-indigo-600',
+      image: '/images/max_hosp.jpeg',
       features: ['State-of-the-art infrastructure', 'Advanced diagnostic equipment', '24x7 emergency services'],
     },
     {
       hospital: 'Fortis Hospital',
-      color: 'from-emerald-600 to-teal-600',
+      image: '/images/fortis_hosp.jpeg',
       features: ['Multi-specialty healthcare', 'Advanced surgical facilities', 'ICU & Critical care units'],
     },
     {
       hospital: 'CityCare Hospital',
-      color: 'from-rose-600 to-pink-600',
+      image: '/images/city_hosp.jpeg',
       features: ['Comprehensive healthcare services', 'Modern medical technology', 'Experienced medical team'],
     },
   ];
@@ -117,16 +117,15 @@ function HomePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-20">
             <Link to="/" className="flex items-center gap-3 group">
-              <div className="relative flex items-center justify-center w-10 h-10 bg-med-600 rounded-xl overflow-hidden shadow-lg group-hover:scale-105 transition-transform duration-300">
-                <div className="absolute inset-0 bg-gradient-to-tr from-med-500 to-med-700 opacity-90"></div>
-                <Activity className="w-6 h-6 text-white relative z-10" />
+              <div className="relative flex items-center justify-center w-10 h-10 bg-white rounded-xl overflow-hidden shadow-lg group-hover:scale-105 transition-transform duration-300">
+                <img src="/images/logo.jpeg" alt="Prognosis Care Logo" className="w-full h-full object-cover" />
               </div>
               <div>
                 <h1 className="text-xl font-bold text-slate-900 tracking-tight group-hover:text-med-600 transition-colors">Prognosis Care</h1>
                 <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">AI Healthcare Triage</p>
               </div>
             </Link>
-            
+
             <div className="flex items-center gap-4">
               <Link
                 to="/auth"
@@ -148,14 +147,14 @@ function HomePage() {
       {/* Hero Section */}
       <section ref={heroRef} className="relative pt-32 pb-20 lg:pt-48 lg:pb-32 overflow-hidden">
         <motion.div style={{ y }} className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-med-100/40 via-blue-50/20 to-transparent"></motion.div>
-        
+
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="max-w-4xl mx-auto text-center">
             <div className="inline-flex items-center gap-2 px-3 py-1 mb-8 rounded-full bg-med-50 border border-med-100 text-med-700 text-sm font-medium">
               <span className="flex h-2 w-2 rounded-full bg-med-500 animate-pulse"></span>
               New: Advanced AI Diagnostics Available
             </div>
-            
+
             <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold text-slate-900 tracking-tight mb-8 leading-[1.1]">
               <div className="overflow-hidden">
                 <span className="hero-title-char inline-block">Healthcare</span>{' '}
@@ -165,8 +164,8 @@ function HomePage() {
                 <span className="hero-title-char inline-block">With Intelligence</span>
               </div>
             </h1>
-            
-            <motion.p 
+
+            <motion.p
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.5, duration: 0.8 }}
@@ -174,8 +173,8 @@ function HomePage() {
             >
               Experience the future of medical care with instant AI-powered triage, seamless appointments, and expert consolidation.
             </motion.p>
-            
-            <motion.div 
+
+            <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.7, duration: 0.8 }}
@@ -207,7 +206,7 @@ function HomePage() {
             <p className="text-slate-500 text-lg max-w-2xl mx-auto">Comprehensive tools designed to make your healthcare journey smoother and more effective.</p>
           </div>
 
-          <motion.div 
+          <motion.div
             variants={containerVariants}
             initial="hidden"
             whileInView="visible"
@@ -273,9 +272,13 @@ function HomePage() {
                 transition={{ delay: index * 0.1 }}
                 className="relative group rounded-3xl overflow-hidden bg-white shadow-lg hover:shadow-2xl transition-all duration-300"
               >
-                <div className={`h-32 bg-gradient-to-r ${hospital.color} relative overflow-hidden`}>
-                  <div className="absolute inset-0 bg-black/10 group-hover:bg-black/0 transition-colors"></div>
-                  <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-white/20 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-500"></div>
+                <div className="h-48 relative overflow-hidden">
+                  <img
+                    src={hospital.image}
+                    alt={hospital.hospital}
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-transparent to-transparent"></div>
                 </div>
                 <div className="p-8">
                   <h3 className="text-2xl font-bold text-slate-900 mb-4">{hospital.hospital}</h3>
@@ -316,8 +319,8 @@ function HomePage() {
       <footer className="bg-slate-50 border-t border-slate-200 py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-6">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center">
-              <Activity className="w-5 h-5 text-white" />
+            <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center overflow-hidden border border-slate-200">
+              <img src="/images/logo.jpeg" alt="Logo" className="w-full h-full object-cover" />
             </div>
             <span className="text-lg font-bold text-slate-900">Prognosis Care</span>
           </div>
