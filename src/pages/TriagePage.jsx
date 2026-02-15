@@ -7,7 +7,61 @@ function TriagePage() {
   const [filePreview, setFilePreview] = useState(null);
   const { state, loading, loadRecommendations, analyzeWithDocs } = useApp(); // Destructure analyzeWithDocs
 
-  // ... (SpeechRecognition effect remains the same)
+  // State for symptoms and errors
+  const [symptoms, setSymptoms] = useState('');
+  const [interimText, setInterimText] = useState('');
+  const [error, setError] = useState('');
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef(null);
+  const [voiceSupported, setVoiceSupported] = useState(false);
+
+  useEffect(() => {
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      setVoiceSupported(true);
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+
+      recognition.onresult = (event) => {
+        let final = '';
+        let interim = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            final += event.results[i][0].transcript;
+          } else {
+            interim += event.results[i][0].transcript;
+          }
+        }
+        if (final) {
+          setSymptoms((prev) => prev + (prev ? ' ' : '') + final);
+        }
+        setInterimText(interim);
+      };
+
+      recognition.onerror = (event) => {
+        console.error('Speech recognition error', event.error);
+        setIsListening(false);
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognitionRef.current = recognition;
+    }
+  }, []);
+
+  const toggleListening = useCallback(() => {
+    if (!recognitionRef.current) return;
+    if (isListening) {
+      recognitionRef.current.stop();
+    } else {
+      recognitionRef.current.start();
+      setIsListening(true);
+    }
+  }, [isListening]);
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
