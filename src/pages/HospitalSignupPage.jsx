@@ -14,7 +14,7 @@ import {
   Lock,
   ArrowRight,
   AlertCircle,
-  checkCircle2 as CheckCircle2, // Lucide export might be lowercase for some versions, but standard is PascalCase. Let's use checkCircle2 if problematic, but standard is CheckCircle2.
+  CheckCircle2,
   ShieldCheck,
   Stethoscope
 } from 'lucide-react';
@@ -241,8 +241,8 @@ function HospitalSignupPage() {
                   animate={{ opacity: 1, height: 'auto' }}
                   exit={{ opacity: 0, height: 0 }}
                   className={`mb-6 p-4 rounded-xl text-sm font-medium border flex items-start gap-3 ${toast.message
-                      ? (toast.type === 'success' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-red-50 text-red-700 border-red-100')
-                      : 'bg-red-50 text-red-700 border-red-100'
+                    ? (toast.type === 'success' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-red-50 text-red-700 border-red-100')
+                    : 'bg-red-50 text-red-700 border-red-100'
                     }`}
                 >
                   <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
