@@ -3,11 +3,14 @@ import { departmentList as baseDepartments, doctors as baseDoctors } from '../se
 import { sampleAppointments } from '../services/sampleAppointmentsData';
 import {
   createBooking,
-  fetchAiRecommendations,
   processMockPayment,
   uploadReportMock,
 } from '../services/mockApi';
-import { fetchGeminiRecommendations } from '../services/geminiService';
+import {
+  fetchGeminiRecommendations,
+  isLikelyHealthSymptomInput,
+  isSimpleLowRiskSymptomInput,
+} from '../services/geminiService';
 import { fetchPrediction } from '../services/predictionService';
 
 const AppContext = createContext(null);
@@ -558,27 +561,55 @@ export function AppProvider({ children }) {
       return;
     }
 
+    if (!isLikelyHealthSymptomInput(cleanSymptoms)) {
+      setState((prev) => ({
+        ...prev,
+        patientSymptoms: cleanSymptoms,
+        recommendedTests: [],
+        recommendationSummary: 'Please describe your health symptoms (for example: fever, cough, chest pain) so I can help.',
+      }));
+      return;
+    }
+
+    if (isSimpleLowRiskSymptomInput(cleanSymptoms)) {
+      setState((prev) => ({
+        ...prev,
+        patientSymptoms: cleanSymptoms,
+        recommendedTests: [],
+        recommendationSummary:
+          'This sounds like a mild symptom pattern. Start with rest, hydration, posture correction, light stretching, and a simple pain-relief approach if suitable for you. If symptoms worsen, persist beyond a few days, or any red-flag signs appear, consult a doctor promptly.',
+      }));
+      return;
+    }
+
     setLoading((prev) => ({ ...prev, recommendations: true }));
 
     let data;
     try {
-      // 1. Try Local Backend (Our trained model)
-      console.log('Fetching from Local Backend...');
-      const backendResponse = await fetchPrediction(cleanSymptoms);
-      // Map backend response to shape expected by UI
-      data = {
-        summary: backendResponse.summary,
-        tests: backendResponse.tests.map(t => ({ ...t, priority: 'high' })) // default priority
-      };
-    } catch (backendErr) {
-      console.warn('Backend failed, trying Gemini:', backendErr);
+      // 1. Primary: Gemini (user-requested AI assistant behavior)
+      data = await fetchGeminiRecommendations(cleanSymptoms);
+
+      if (data?.isHealthRelated === false) {
+        data = {
+          summary: 'Please describe your health symptoms (for example: fever, cough, chest pain) so I can help.',
+          tests: [],
+        };
+      }
+    } catch (geminiErr) {
+      console.warn('Gemini failed, trying local backend:', geminiErr);
       try {
-        // 2. Try Gemini API
-        data = await fetchGeminiRecommendations(cleanSymptoms);
-      } catch (geminiErr) {
-        console.warn('Gemini API failed, falling back to mock data:', geminiErr.message);
-        // 3. Fallback to Mock
-        data = await fetchAiRecommendations();
+        // 2. Fallback: local backend model
+        const backendResponse = await fetchPrediction(cleanSymptoms);
+        data = {
+          summary: backendResponse.summary,
+          tests: (backendResponse.tests || []).map((test) => ({ ...test, priority: test.priority || 'medium' })),
+        };
+      } catch (backendErr) {
+        console.warn('Local backend also failed:', backendErr);
+        data = {
+          summary: 'Unable to generate recommendations right now. Please try again in a moment.',
+          tests: [],
+        };
       }
     }
 
