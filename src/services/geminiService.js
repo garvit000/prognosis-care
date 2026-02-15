@@ -224,8 +224,8 @@ export async function fetchGeminiRecommendations(symptoms, fileBase64 = null, mi
 
   if (fileBase64 && mimeType) {
     parts.push({
-      inlineData: {
-        mimeType: mimeType,
+      inline_data: {
+        mime_type: mimeType,
         data: fileBase64.split(',')[1] || fileBase64 // Ensure only raw base64 is sent
       }
     });
