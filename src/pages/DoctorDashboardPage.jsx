@@ -36,16 +36,41 @@ function DoctorDashboardPage() {
 
   const doctor = state.doctors.find((item) => item.id === currentUser?.doctorId);
   const scoped = useMemo(() => getDoctorScopedData(currentUser?.doctorId), [currentUser?.doctorId]);
+  // Merge Global State Appointments with Mock Data for demonstration
+  // In a real app, all would come from state or backend.
+  // We prioritize state appointments (new bookings) and add mock ones if needed, 
+  // or just use state if we want to be clean.
+  // Let's use state.appointments primarily, but if empty, fall back to mock for demo.
 
-  const patientMap = Object.fromEntries(scoped.patients.map((patient) => [patient.id, patient]));
+  const doctorAppointments = useMemo(() => {
+    // Filter global appointments for this doctor
+    const realAppointments = state.appointments.filter(
+      (appt) => appt.doctorId === currentUser?.doctorId || appt.doctor_id === currentUser?.doctorId
+    );
+
+    // If we have real appointments, use them. 
+    // Otherwise, for demo purposes, use the scoped mock data.
+    // actually, let's combine them so we see both pre-seeded and new ones.
+    return [...realAppointments, ...scoped.appointments].filter(
+      (v, i, a) => a.findIndex((t) => t.id === v.id) === i
+    );
+  }, [state.appointments, currentUser?.doctorId, scoped.appointments]);
+
+  const patientMap = useMemo(() => {
+    const mockPatients = Object.fromEntries(scoped.patients.map((patient) => [patient.id, patient]));
+    // We also need to map patient details from the appointment itself if not in mockPatients
+    // The appointment object has patientName, but for detailed view we might need more.
+    // For now, we'll just use what we have.
+    return mockPatients;
+  }, [scoped.patients]);
 
   const today = new Date().toISOString().slice(0, 10);
-  const todaysAppointments = scoped.appointments
+  const todaysAppointments = doctorAppointments
     .filter((appointment) => appointment.date === today)
     .sort((first, second) => parseTime(first.time) - parseTime(second.time));
 
-  const upcomingAppointments = scoped.appointments
-    .filter((appointment) => appointment.date > today || (appointment.date === today && parseTime(appointment.time) >= parseTime(new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })) ))
+  const upcomingAppointments = doctorAppointments
+    .filter((appointment) => appointment.date > today || (appointment.date === today && parseTime(appointment.time) >= parseTime(new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }))))
     .sort((first, second) => `${first.date} ${first.time}`.localeCompare(`${second.date} ${second.time}`));
 
   const currentMinutes = parseTime(
@@ -61,10 +86,10 @@ function DoctorDashboardPage() {
 
   const pendingReports = scoped.reports.filter((report) => report.status === 'Pending');
 
-  const totalConsultations = scoped.appointments.filter((appointment) => appointment.status === 'Completed').length;
+  const totalConsultations = doctorAppointments.filter((appointment) => appointment.status === 'Completed').length;
   const consultationFee = doctor?.consultationFee || 0;
   const todayEarnings = todaysAppointments.filter((appointment) => appointment.status === 'Completed').length * consultationFee;
-  const monthlyEarnings = scoped.appointments.filter((appointment) => appointment.status === 'Completed').length * consultationFee;
+  const monthlyEarnings = doctorAppointments.filter((appointment) => appointment.status === 'Completed').length * consultationFee;
 
   const profileState = useMemo(
     () => ({
