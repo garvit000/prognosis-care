@@ -31,23 +31,10 @@ Try a hard refresh to bypass cache:
 
 ## Verify Data Loaded
 
-After clearing, check the browser console for these messages:
-```
-🔄 Refreshing appointments data with new sample appointments...
-✅ Loaded 27 sample appointments
-```
+After clearing, refresh the app and confirm your dashboard/cards show data as expected.
+You can also inspect browser console logs for seed refresh messages if enabled.
 
-## Doctor Login Credentials
+## Login Notes
 
-```
-Email: oompathania@gmail.com
-Password: abcd123
-Doctor: Dr. Garvit Pathania
-Department: Neurology
-```
-
-Expected appointments for Dr. Garvit Pathania: **11 appointments**
-- Today (Feb 15, 2026): 4 appointments
-- Upcoming: 7 total
-- Completed: 3
-- Cancelled: 1
+Use the credentials configured in your local `.env` file for doctor/super-admin access.
+Avoid storing real credentials in repository documentation.
