@@ -28,6 +28,13 @@ import LoginPage from './pages/LoginPage';
 import DoctorLoginPage from './pages/DoctorLoginPage';
 import SignupPage from './pages/SignupPage';
 import NotificationToast from './components/NotificationToast';
+import ChatBot from './components/ChatBot';
+
+// ... (existing imports)
+
+// Inside App component return, after NotificationToast:
+{ currentUser ? <NotificationToast /> : null }
+{ currentUser ? <ChatBot /> : null }
 import HospitalSelectionModal from './components/HospitalSelectionModal';
 import PortalBackButton from './components/PortalBackButton';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -297,6 +304,7 @@ function App() {
       </main>
 
       {currentUser ? <NotificationToast /> : null}
+      {currentUser ? <ChatBot /> : null}
 
       {showHospitalSelectionModal ? (
         <HospitalSelectionModal

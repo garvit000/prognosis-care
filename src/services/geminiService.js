@@ -258,3 +258,54 @@ export async function fetchGeminiRecommendations(symptoms, fileBase64 = null, mi
 
   return parseGeminiResponse(textContent);
 }
+
+/**
+ * ChatBot specific interaction. 
+ * Strictly restricted to App support context.
+ */
+export async function fetchChatBotResponse(message, history = []) {
+  if (!GEMINI_API_KEY) return "I'm sorry, I'm offline right now (API Key missing).";
+
+  // specialized system instruction
+  const systemInstruction = `You are the specific AI Support Assistant for "Prognosis Care", a hospital appointment and triage app.
+  
+  YOUR RESPONSIBILITIES:
+  1. Guide users on how to book appointments (Go to "Dashboard" or "Specialists").
+  2. Explain how to use the AI Triage feature (Go to "AI Assistant").
+  3. Help with viewing Medical Records.
+  4. Answer questions about doctors or departments based on general medical knowledge (e.g., "What does a Cardiologist do?").
+  
+  STRICT RESTRICTIONS:
+  - If the user asks about anything unrelated to this app, healthcare, or appointments (e.g., "Write a poem", "Capital of France", "Coding help"), politely REFUSE. Say: "I can only help you with Prognosis Care services and health appointments."
+  - Do not hallucinate features we don't have. We have: Appointments, AI Triage, Medical Records, Ambulance, Lab Booking.
+  - Keep answers short, friendly, and concise (max 2-3 sentences).
+  
+  Current User interaction:
+  `;
+
+  // Simple history formatting
+  const historyText = history.map(h => `${h.role === 'user' ? 'User' : 'Assistant'}: ${h.text}`).join('\n');
+  const prompt = `${systemInstruction}\n\nChat History:\n${historyText}\n\nUser: ${message}\nAssistant:`;
+
+  try {
+    const response = await fetch(GEMINI_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.3, // Lower temperature for more deterministic/focused answers
+          maxOutputTokens: 150,
+        },
+      }),
+    });
+
+    if (!response.ok) throw new Error('API Error');
+
+    const json = await response.json();
+    return json?.candidates?.[0]?.content?.parts?.[0]?.text || "I'm having trouble connecting. Please try again.";
+  } catch (error) {
+    console.error('ChatBot Error:', error);
+    return "I'm sorry, I'm having trouble connecting right now.";
+  }
+}
