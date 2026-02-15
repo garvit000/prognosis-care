@@ -4,7 +4,8 @@
  */
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+const GEMINI_MODEL = import.meta.env.VITE_GEMINI_MODEL || 'gemini-2.0-flash';
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
 
 /**
  * Build the prompt that instructs Gemini to return structured JSON.
@@ -15,12 +16,15 @@ function buildPrompt(symptoms) {
 A patient describes the following symptoms:
 "${symptoms}"
 
+First determine whether this input is actually health/symptom related.
+
 Based on the symptoms, provide:
-1. A short medical summary (2-3 sentences) explaining the likely concern and why tests are needed.
-2. A list of 3-5 recommended diagnostic tests (ordered by priority).
+1. A short medical triage summary (1-3 sentences).
+2. A list of recommended diagnostic tests ONLY if medically needed.
 
 IMPORTANT: Respond ONLY with valid JSON in the exact format below — no markdown, no backticks, no extra text:
 {
+  "isHealthRelated": true,
   "summary": "Your 2-3 sentence medical summary here.",
   "tests": [
     {
@@ -34,10 +38,114 @@ IMPORTANT: Respond ONLY with valid JSON in the exact format below — no markdow
 }
 
 Rules:
-- Use realistic Indian hospital test costs in INR (₹500–₹5000 range).
-- Prioritise tests that are medically relevant.
-- Do NOT diagnose; only recommend tests.
+- If input is NOT health-related (for example: coding, math, random chat, jokes), return:
+  - isHealthRelated: false
+  - summary: "Please describe your health symptoms (for example: fever, cough, chest pain) so I can help."
+  - tests: []
+- For isolated mild back pain/body pain/headache without red-flag symptoms, do not suggest blood tests/CRP/advanced panels by default.
+- For mild isolated symptoms (for example only "headache" with no red flags), keep tests minimal or empty.
+- Use realistic Indian hospital test costs in INR (₹500–₹5000 range) only when tests are needed.
+- Prioritise tests that are clearly medically relevant.
+- Do NOT diagnose; only provide triage guidance.
 - Respond with pure JSON only.`;
+}
+
+export function isLikelyHealthSymptomInput(input) {
+  const text = (input || '').toLowerCase().trim();
+  if (!text) return false;
+
+  const genericOnlyInputs = new Set([
+    'health',
+    'healthy',
+    'symptom',
+    'symptoms',
+    'medical',
+    'doctor',
+    'help',
+    'hi',
+    'hello',
+  ]);
+
+  if (genericOnlyInputs.has(text)) return false;
+
+  const healthKeywords = [
+    'pain',
+    'headache',
+    'fever',
+    'cough',
+    'cold',
+    'vomit',
+    'nausea',
+    'dizziness',
+    'breath',
+    'chest',
+    'bp',
+    'blood pressure',
+    'sugar',
+    'diabetes',
+    'fatigue',
+    'weakness',
+    'infection',
+    'injury',
+    'swelling',
+    'rash',
+    'stomach',
+    'diarrhea',
+    'constipation',
+    'anxiety',
+    'depression',
+    'symptom',
+  ];
+
+  const hasHealthKeyword = healthKeywords.some((keyword) => text.includes(keyword));
+  if (!hasHealthKeyword) return false;
+
+  const meaningfulWords = text.split(/\s+/).filter(Boolean);
+  return meaningfulWords.length >= 2 || text.includes('pain');
+}
+
+export function isSimpleLowRiskSymptomInput(input) {
+  const text = (input || '').toLowerCase().trim();
+  if (!text) return false;
+
+  const lowRiskKeywords = [
+    'back pain',
+    'lower back pain',
+    'body pain',
+    'muscle pain',
+    'neck pain',
+    'headache',
+    'mild pain',
+    'soreness',
+  ];
+
+  const redFlagKeywords = [
+    'severe',
+    'unbearable',
+    'chest pain',
+    'shortness of breath',
+    'breathing issue',
+    'fainting',
+    'numbness',
+    'weakness in leg',
+    'paralysis',
+    'injury',
+    'trauma',
+    'accident',
+    'fall',
+    'fever',
+    'weight loss',
+    'blood in urine',
+    'loss of bladder control',
+    'loss of bowel control',
+    'night sweats',
+    'persistent vomiting',
+  ];
+
+  const hasLowRiskSymptom = lowRiskKeywords.some((keyword) => text.includes(keyword));
+  const hasRedFlag = redFlagKeywords.some((keyword) => text.includes(keyword));
+
+  return hasLowRiskSymptom && !hasRedFlag;
 }
 
 /**
@@ -55,7 +163,11 @@ function parseGeminiResponse(text) {
     const parsed = JSON.parse(cleaned);
     // Validate shape
     if (parsed.summary && Array.isArray(parsed.tests)) {
-      return parsed;
+      return {
+        isHealthRelated: parsed.isHealthRelated !== false,
+        summary: parsed.summary,
+        tests: parsed.tests,
+      };
     }
   } catch {
     // Attempt regex extraction as last resort
@@ -64,7 +176,11 @@ function parseGeminiResponse(text) {
       try {
         const fallback = JSON.parse(jsonMatch[0]);
         if (fallback.summary && Array.isArray(fallback.tests)) {
-          return fallback;
+          return {
+            isHealthRelated: fallback.isHealthRelated !== false,
+            summary: fallback.summary,
+            tests: fallback.tests,
+          };
         }
       } catch {
         // fall through to default
@@ -74,6 +190,7 @@ function parseGeminiResponse(text) {
 
   // If nothing works, return a generic response
   return {
+    isHealthRelated: true,
     summary: text.slice(0, 300),
     tests: [],
   };

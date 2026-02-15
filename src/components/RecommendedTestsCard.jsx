@@ -15,7 +15,9 @@ function RecommendedTestsCard({ tests = [], summary, onProceed }) {
     return (
       <section className="card">
         <h2 className="text-xl font-semibold">Recommended Tests</h2>
-        <p className="mt-2 text-sm text-slate-600">No tests suggested yet. Start AI triage to generate recommendations.</p>
+        <p className="mt-2 text-sm text-slate-600">
+          {summary || 'No tests are needed right now based on the symptoms provided. If symptoms worsen or continue, consult a doctor.'}
+        </p>
       </section>
     );
   }

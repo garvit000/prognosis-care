@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { getExtendedTermsAndConditionsLines } from '../content/termsAndConditions';
 
 function SignupPage() {
   const { currentUser, signup, getRoleHomeRoute } = useAuth();
@@ -8,8 +9,12 @@ function SignupPage() {
   const [form, setForm] = useState({ email: '', password: '', confirmPassword: '' });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showTermsModal, setShowTermsModal] = useState(false);
+  const [termsReviewed, setTermsReviewed] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const termsLines = getExtendedTermsAndConditionsLines(500);
 
   if (currentUser) {
     return <Navigate to={getRoleHomeRoute(currentUser.role)} replace />;
@@ -28,6 +33,11 @@ function SignupPage() {
 
     if (form.password !== form.confirmPassword) {
       setError('Passwords do not match.');
+      return;
+    }
+
+    if (!acceptedTerms) {
+      setError('Please accept the Terms & Conditions to continue.');
       return;
     }
 
@@ -112,6 +122,29 @@ function SignupPage() {
                 </button>
               </div>
 
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm">
+                <label className="flex items-start gap-2 text-slate-700">
+                  <input
+                    type="checkbox"
+                    className="mt-1 h-4 w-4 accent-med-700"
+                    checked={acceptedTerms}
+                    disabled={!termsReviewed}
+                    onChange={(event) => setAcceptedTerms(event.target.checked)}
+                  />
+                  <span>
+                    I agree to the{' '}
+                    <button
+                      type="button"
+                      className="font-semibold text-med-700 underline-offset-2 hover:underline"
+                      onClick={() => setShowTermsModal(true)}
+                    >
+                      Terms & Conditions
+                    </button>
+                    . {!termsReviewed ? 'Open and mark Done first.' : ''}
+                  </span>
+                </label>
+              </div>
+
               {error ? <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p> : null}
 
               <button className="btn-primary w-full" type="submit" disabled={loading}>
@@ -136,6 +169,48 @@ function SignupPage() {
           </div>
         </section>
       </div>
+
+      {showTermsModal ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
+          <div className="w-full max-w-2xl rounded-2xl bg-white p-5 shadow-2xl">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-med-600">Patient Policy</p>
+                <h3 className="mt-1 text-xl font-bold text-slate-900">Terms & Conditions</h3>
+              </div>
+              <button
+                type="button"
+                className="rounded-lg px-2 py-1 text-sm text-slate-500 hover:bg-slate-100"
+                onClick={() => setShowTermsModal(false)}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="mt-4 max-h-[52vh] space-y-3 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+              {termsLines.map((line) => (
+                <p key={line}>{line}</p>
+              ))}
+            </div>
+
+            <div className="mt-4 flex justify-end gap-2">
+              <button type="button" className="btn-secondary" onClick={() => setShowTermsModal(false)}>
+                Close
+              </button>
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => {
+                  setTermsReviewed(true);
+                  setShowTermsModal(false);
+                }}
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -23,6 +23,13 @@ export const quickActions = [
     to: '/my-appointments',
   },
   {
+    id: 'ambulance',
+    title: 'Request Ambulance',
+    description: 'Dispatch nearest hospital ambulance with live tracking simulation.',
+    icon: '🚑',
+    to: '/ambulance',
+  },
+  {
     id: 'lab',
     title: 'Schedule Lab Test',
     description: 'Book diagnostics with transparent billing details.',

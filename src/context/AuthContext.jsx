@@ -11,6 +11,22 @@ import { secureSuperAdminCredentials, hardcodedDoctors } from '../services/secur
 const AuthContext = createContext(null);
 const AUTH_SESSION_KEY = 'pc_auth_session';
 
+function getPrimarySessionStorage() {
+  try {
+    return window.sessionStorage;
+  } catch {
+    return null;
+  }
+}
+
+function getLegacySessionStorage() {
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
 function createMockJwtToken(payload) {
   const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
   const body = btoa(JSON.stringify({ ...payload, iat: Date.now() }));
@@ -27,7 +43,22 @@ function getRoleHomeRoute(role) {
 
 function getStoredSession() {
   try {
-    const raw = localStorage.getItem(AUTH_SESSION_KEY);
+    const primary = getPrimarySessionStorage();
+    const legacy = getLegacySessionStorage();
+
+    const raw = primary?.getItem(AUTH_SESSION_KEY);
+    if (raw) {
+      return JSON.parse(raw);
+    }
+
+    // Backward compatibility: migrate old localStorage session to sessionStorage
+    const legacyRaw = legacy?.getItem(AUTH_SESSION_KEY);
+    if (legacyRaw) {
+      primary?.setItem(AUTH_SESSION_KEY, legacyRaw);
+      legacy?.removeItem(AUTH_SESSION_KEY);
+      return JSON.parse(legacyRaw);
+    }
+
     return raw ? JSON.parse(raw) : null;
   } catch {
     return null;
@@ -35,11 +66,17 @@ function getStoredSession() {
 }
 
 function saveSession(session) {
-  localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(session));
+  const primary = getPrimarySessionStorage();
+  const legacy = getLegacySessionStorage();
+  primary?.setItem(AUTH_SESSION_KEY, JSON.stringify(session));
+  legacy?.removeItem(AUTH_SESSION_KEY);
 }
 
 function clearSession() {
-  localStorage.removeItem(AUTH_SESSION_KEY);
+  const primary = getPrimarySessionStorage();
+  const legacy = getLegacySessionStorage();
+  primary?.removeItem(AUTH_SESSION_KEY);
+  legacy?.removeItem(AUTH_SESSION_KEY);
 }
 
 function updateSession(updater) {

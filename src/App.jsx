@@ -8,6 +8,7 @@ import OpdDepartmentsPage from './pages/OpdDepartmentsPage';
 import DepartmentDoctorsPage from './pages/DepartmentDoctorsPage';
 import DoctorProfilePage from './pages/DoctorProfilePage';
 import DoctorDashboardPage from './pages/DoctorDashboardPage';
+import AmbulanceRequestPage from './pages/AmbulanceRequestPage';
 import ChatHistoryPage from './pages/ChatHistoryPage';
 import TriagePage from './pages/TriagePage';
 import LabBookingPage from './pages/LabBookingPage';
@@ -38,6 +39,7 @@ const patientNavItems = [
   { to: '/welcome', label: 'Welcome' },
   { to: '/my-appointments', label: 'My Appointments' },
   { to: '/triage', label: 'AI Assistant' },
+  { to: '/ambulance', label: 'Ambulance' },
   { to: '/medical-records', label: 'Medical Records' },
 ];
 
@@ -206,6 +208,14 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['patient']}>
                 <TriagePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/ambulance"
+            element={
+              <ProtectedRoute allowedRoles={['patient']}>
+                <AmbulanceRequestPage />
               </ProtectedRoute>
             }
           />
