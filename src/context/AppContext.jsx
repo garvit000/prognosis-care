@@ -213,6 +213,11 @@ const initialState = {
   paymentHistory: [],
   reports: [],
   notifications: [],
+  // Hackathon AI Fields
+  aiRiskLevel: 'Low',
+  aiConfidenceScore: 0,
+  aiRecommendedDepartment: 'General Medicine',
+  aiReasoning: [],
 };
 
 function buildBillItems(tests, serviceFee, taxRate, insuranceEnabled) {
@@ -677,8 +682,44 @@ export function AppProvider({ children }) {
       patientSymptoms: cleanSymptoms,
       recommendedTests: data.tests,
       recommendationSummary: data.summary,
+      // Hackathon: New fields
+      aiRiskLevel: data.riskLevel || 'Low',
+      aiConfidenceScore: data.confidenceScore || 0,
+      aiRecommendedDepartment: data.recommendedDepartment || 'General Medicine',
+      aiReasoning: data.reasoning || [],
     }));
     setLoading((prev) => ({ ...prev, recommendations: false }));
+  };
+
+  const analyzeWithDocs = async (symptomsText, file) => {
+    setLoading((prev) => ({ ...prev, recommendations: true }));
+    try {
+      let fileBase64 = null;
+      let mimeType = null;
+
+      if (file) {
+        fileBase64 = await readFileAsDataURL(file);
+        mimeType = file.type;
+      }
+
+      const data = await fetchGeminiRecommendations(symptomsText, fileBase64, mimeType);
+
+      setState((prev) => ({
+        ...prev,
+        patientSymptoms: symptomsText,
+        recommendedTests: data.tests,
+        recommendationSummary: data.summary,
+        aiRiskLevel: data.riskLevel || 'Low',
+        aiConfidenceScore: data.confidenceScore || 0,
+        aiRecommendedDepartment: data.recommendedDepartment || 'General Medicine',
+        aiReasoning: data.reasoning || [],
+      }));
+    } catch (error) {
+      console.error('AI Analysis failed:', error);
+      pushNotification('AI Analysis failed. Please try again.');
+    } finally {
+      setLoading((prev) => ({ ...prev, recommendations: false }));
+    }
   };
 
   const saveDraftBooking = ({ location, slot, insuranceEnabled }) => {

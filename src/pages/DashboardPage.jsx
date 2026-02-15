@@ -99,14 +99,14 @@ function DashboardPage() {
   const aiInsight = useMemo(
     () => ({
       recentSymptoms: state.patientSymptoms,
-      riskScore: aiRiskScore || patientRiskScore,
-      recommendedDepartment: state.recommendedTests.some((test) => test.priority === 'high')
-        ? 'Cardiology OPD'
-        : 'General Medicine OPD',
+      riskScore: state.aiConfidenceScore || 0,
+      riskLevel: state.aiRiskLevel || 'Low',
+      recommendedDepartment: state.aiRecommendedDepartment || 'General Medicine',
       pendingTests: state.recommendedTests.map((test) => test.name),
-      trend: buildTrend(aiRiskScore || patientRiskScore),
+      trend: buildTrend(state.aiConfidenceScore || 0),
+      reasoning: state.aiReasoning || [],
     }),
-    [aiRiskScore, patientRiskScore, state.patientSymptoms, state.recommendedTests]
+    [state.patientSymptoms, state.aiConfidenceScore, state.aiRiskLevel, state.aiRecommendedDepartment, state.recommendedTests, state.aiReasoning]
   );
 
   const upcomingEvents = useMemo(() => buildUpcomingEvents(state), [state]);
@@ -116,13 +116,13 @@ function DashboardPage() {
         .filter((doctor) => doctor.hospitalId === selectedHospitalId)
         .slice(0, 8)
         .map((doctor) => ({
-        id: doctor.id,
-        name: doctor.fullName,
-        department: doctor.department,
-        image: doctor.profileImage,
-        nextSlot: doctor.availableTimeSlots[0] || 'Fully booked',
-        status: doctor.availabilityStatus === 'Available' ? 'available' : 'booked',
-      })),
+          id: doctor.id,
+          name: doctor.fullName,
+          department: doctor.department,
+          image: doctor.profileImage,
+          nextSlot: doctor.availableTimeSlots[0] || 'Fully booked',
+          status: doctor.availabilityStatus === 'Available' ? 'available' : 'booked',
+        })),
     [selectedHospitalId, state.doctors]
   );
 
