@@ -19,7 +19,9 @@ export async function fetchPrediction(symptoms) {
             summary: data.summary || `Based on symptoms: ${symptoms}`,
             tests: data.recommended_tests || [],
             disease: data.disease,
-            specialty: data.specialty
+            specialty: data.specialty,
+            riskLevel: data.risk_level,
+            confidenceScore: data?.confidence?.risk_level
         };
 
     } catch (error) {

@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import RecommendedTestsCard from '../components/RecommendedTestsCard';
 import { useApp } from '../context/AppContext';
+import { isLikelyHealthSymptomInput } from '../services/geminiService';
 
 function TriagePage() {
   const [selectedFile, setSelectedFile] = useState(null);
@@ -85,18 +86,26 @@ function TriagePage() {
 
   const handleAnalyze = async () => {
     if (isListening) recognitionRef.current?.stop();
-    if (!symptoms.trim() && !selectedFile) {
-      setError('Please enter symptoms or upload a medical record before running AI analysis.');
+    const cleanSymptoms = symptoms.trim();
+
+    if (!cleanSymptoms) {
+      setError('Please enter health symptoms before running triage.');
       return;
     }
+
+    if (!isLikelyHealthSymptomInput(cleanSymptoms)) {
+      setError('Please enter valid health-related symptoms (for example: fever, cough, chest pain).');
+      return;
+    }
+
     setError('');
 
     if (selectedFile && analyzeWithDocs) {
-      await analyzeWithDocs(symptoms, selectedFile);
+      await analyzeWithDocs(cleanSymptoms, selectedFile);
       return;
     }
 
-    await loadRecommendations(symptoms);
+    await loadRecommendations(cleanSymptoms);
   };
 
   return (

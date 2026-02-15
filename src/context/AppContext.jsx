@@ -205,6 +205,20 @@ function normalizeAiResult(rawData) {
   };
 }
 
+function hasRecommendedTests(data) {
+  return Array.isArray(data?.tests) && data.tests.length > 0;
+}
+
+async function getServiceBackedRecommendations(symptomsText) {
+  const backendResponse = await fetchPrediction(symptomsText);
+  return normalizeAiResult({
+    summary: backendResponse.summary,
+    tests: backendResponse.tests,
+    recommendedDepartment: backendResponse.specialty,
+    riskLevel: backendResponse.riskLevel,
+  });
+}
+
 const hospitals = [
   {
     id: 'hosp-2',
@@ -793,34 +807,54 @@ export function AppProvider({ children }) {
 
     setLoading((prev) => ({ ...prev, recommendations: true }));
 
-    let data;
+    let normalized;
     try {
-      data = await fetchGeminiRecommendations(cleanSymptoms);
+      normalized = await getServiceBackedRecommendations(cleanSymptoms);
 
-      if (data?.isHealthRelated === false) {
-        data = {
-          summary: 'Please describe your health symptoms (for example: fever, cough, chest pain) so I can help.',
-          tests: [],
-        };
+      if (!hasRecommendedTests(normalized)) {
+        const aiResponse = await fetchGeminiRecommendations(cleanSymptoms);
+        normalized = normalizeAiResult(aiResponse);
+
+        if (normalized?.isHealthRelated === false) {
+          normalized = {
+            ...normalized,
+            summary: 'Please describe your health symptoms (for example: fever, cough, chest pain) so I can help.',
+            tests: [],
+          };
+        }
       }
-    } catch (geminiErr) {
-      console.warn('Gemini failed, trying local backend:', geminiErr);
+    } catch (backendErr) {
+      console.warn('Service recommendation failed, trying AI fallback:', backendErr);
       try {
-        const backendResponse = await fetchPrediction(cleanSymptoms);
-        data = {
-          summary: backendResponse.summary,
-          tests: (backendResponse.tests || []).map((test) => ({ ...test, priority: test.priority || 'medium' })),
-        };
-      } catch (backendErr) {
-        console.warn('Local backend also failed:', backendErr);
-        data = {
+        const aiResponse = await fetchGeminiRecommendations(cleanSymptoms);
+        normalized = normalizeAiResult(aiResponse);
+
+        if (!hasRecommendedTests(normalized)) {
+          try {
+            const backendNormalized = await getServiceBackedRecommendations(cleanSymptoms);
+            if (hasRecommendedTests(backendNormalized)) {
+              normalized = {
+                ...normalized,
+                tests: backendNormalized.tests,
+                recommendedDepartment: normalized.recommendedDepartment || backendNormalized.recommendedDepartment,
+              };
+            }
+          } catch {
+            // keep AI-only response if backend stays unavailable
+          }
+        }
+      } catch (aiErr) {
+        console.warn('AI fallback also failed:', aiErr);
+        normalized = {
           summary: 'Unable to generate recommendations right now. Please try again in a moment.',
           tests: [],
+          riskLevel: 'Low',
+          confidenceScore: 0,
+          recommendedDepartment: 'General Medicine',
+          reasoning: [],
         };
       }
     }
-
-    const normalized = normalizeAiResult(data);
 
     setState((prev) => ({
       ...prev,
@@ -836,6 +870,28 @@ export function AppProvider({ children }) {
   };
 
   const analyzeWithDocs = async (symptomsText, file) => {
+    const cleanSymptoms = symptomsText?.trim();
+
+    if (!cleanSymptoms) {
+      setState((prev) => ({
+        ...prev,
+        patientSymptoms: '',
+        recommendedTests: [],
+        recommendationSummary: 'Please enter health symptoms before running triage.',
+      }));
+      return;
+    }
+
+    if (!isLikelyHealthSymptomInput(cleanSymptoms)) {
+      setState((prev) => ({
+        ...prev,
+        patientSymptoms: cleanSymptoms,
+        recommendedTests: [],
+        recommendationSummary: 'Please enter valid health-related symptoms (for example: fever, cough, chest pain).',
+      }));
+      return;
+    }
+
     setLoading((prev) => ({ ...prev, recommendations: true }));
     try {
       let fileBase64 = null;
@@ -847,11 +903,26 @@ export function AppProvider({ children }) {
       }
 
       const data = await fetchGeminiRecommendations(symptomsText, fileBase64, mimeType);
-      const normalized = normalizeAiResult(data);
+      let normalized = normalizeAiResult(data);
+
+      if (cleanSymptoms && !hasRecommendedTests(normalized)) {
+        try {
+          const backendNormalized = await getServiceBackedRecommendations(cleanSymptoms);
+          if (hasRecommendedTests(backendNormalized)) {
+            normalized = {
+              ...normalized,
+              tests: backendNormalized.tests,
+              recommendedDepartment: normalized.recommendedDepartment || backendNormalized.recommendedDepartment,
+            };
+          }
+        } catch {
+          // keep AI response only when backend isn't available
+        }
+      }
 
       setState((prev) => ({
         ...prev,
-        patientSymptoms: symptomsText,
+        patientSymptoms: cleanSymptoms || symptomsText,
         recommendedTests: normalized.tests,
         recommendationSummary: normalized.summary,
         aiRiskLevel: normalized.riskLevel || 'Low',
