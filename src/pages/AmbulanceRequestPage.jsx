@@ -3,24 +3,17 @@ import { CircleMarker, MapContainer, Marker, Polyline, Popup, TileLayer, useMap 
 import L from 'leaflet';
 import { useApp } from '../context/AppContext';
 
-const hospitalCoordinates = {
-  'hosp-1': { lat: 28.6139, lng: 77.209 },
-  'hosp-2': { lat: 28.5672, lng: 77.210 },
-  'hosp-3': { lat: 28.5355, lng: 77.391 },
+const POTHERI_SRM_DESTINATION = {
+  lat: 12.8230,
+  lng: 80.0444,
+  label: 'Potheri, SRM University, Chennai 603203',
 };
 
-function hashAddressToPoint(address) {
-  const text = (address || '').trim().toLowerCase();
-  let hash = 0;
-  for (let i = 0; i < text.length; i += 1) {
-    hash = (hash * 31 + text.charCodeAt(i)) % 10000;
-  }
-
-  return {
-    lat: 28.45 + ((hash % 2200) / 2200) * 0.35,
-    lng: 77.02 + ((Math.floor(hash / 97) % 2500) / 2500) * 0.45,
-  };
-}
+const hospitalCoordinates = {
+  'hosp-1': { lat: 12.9137, lng: 80.1260 },
+  'hosp-2': { lat: 12.7963, lng: 80.2206 },
+  'hosp-3': { lat: 12.6928, lng: 79.9771 },
+};
 
 function computeDistance(a, b) {
   const R = 6371;
@@ -43,19 +36,24 @@ function interpolate(start, end, progress) {
   };
 }
 
-async function geocodeAddress(address) {
-  const query = encodeURIComponent(address);
-  const response = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&q=${query}&limit=1`);
-  if (!response.ok) throw new Error('Unable to geocode address.');
-
-  const list = await response.json();
-  if (!Array.isArray(list) || !list.length) {
-    throw new Error('Address not found on map.');
+async function fetchRoadRoute(start, end) {
+  const url = `https://router.project-osrm.org/route/v1/driving/${start.lng},${start.lat};${end.lng},${end.lat}?overview=full&geometries=geojson`;
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error('Unable to fetch road route.');
   }
 
+  const payload = await response.json();
+  const route = payload?.routes?.[0];
+  if (!route?.geometry?.coordinates?.length) {
+    throw new Error('No route geometry received.');
+  }
+
+  const points = route.geometry.coordinates.map(([lng, lat]) => ({ lat, lng }));
   return {
-    lat: Number(list[0].lat),
-    lng: Number(list[0].lon),
+    points,
+    durationMinutes: Math.max(3, Math.round((route.duration || 0) / 60)),
+    distanceKm: Number(((route.distance || 0) / 1000).toFixed(1)),
   };
 }
 
@@ -66,17 +64,24 @@ const ambulanceIcon = L.divIcon({
   iconAnchor: [12, 12],
 });
 
-function FitToRoute({ hospitalPoint, patientPoint }) {
+function FitToRoute({ routePoints, hospitalPoint, patientPoint }) {
   const map = useMap();
 
   useEffect(() => {
     if (!hospitalPoint || !patientPoint) return;
-    const bounds = L.latLngBounds(
-      [hospitalPoint.lat, hospitalPoint.lng],
-      [patientPoint.lat, patientPoint.lng]
-    );
+
+    let bounds;
+    if (routePoints.length) {
+      bounds = L.latLngBounds(routePoints.map((point) => [point.lat, point.lng]));
+    } else {
+      bounds = L.latLngBounds(
+        [hospitalPoint.lat, hospitalPoint.lng],
+        [patientPoint.lat, patientPoint.lng]
+      );
+    }
+
     map.fitBounds(bounds.pad(0.35));
-  }, [map, hospitalPoint, patientPoint]);
+  }, [map, routePoints, hospitalPoint, patientPoint]);
 
   return null;
 }
@@ -92,59 +97,64 @@ function AmbulanceRequestPage() {
   const [statusText, setStatusText] = useState('');
   const [isResolvingAddress, setIsResolvingAddress] = useState(false);
   const [addressError, setAddressError] = useState('');
+  const [routePoints, setRoutePoints] = useState([]);
+  const [routeDistanceKm, setRouteDistanceKm] = useState(null);
+  const [routeIndex, setRouteIndex] = useState(0);
 
   const nearestHospitalPoint = nearestHospital ? hospitalCoordinates[nearestHospital.id] : null;
 
   const ambulancePoint = useMemo(() => {
+    if (routePoints.length) {
+      return routePoints[Math.min(routeIndex, routePoints.length - 1)] || null;
+    }
     if (!nearestHospitalPoint || !patientPoint) return null;
     return interpolate(nearestHospitalPoint, patientPoint, progress);
-  }, [nearestHospitalPoint, patientPoint, progress]);
+  }, [routePoints, routeIndex, nearestHospitalPoint, patientPoint, progress]);
 
   useEffect(() => {
-    if (!requested) return undefined;
+    if (!requested || !routePoints.length) return undefined;
 
     const timer = setInterval(() => {
-      setProgress((prev) => {
-        const next = Math.min(prev + 0.05, 1);
-        const mins = Math.max(1, Math.ceil((1 - next) * (etaMins || 1)));
+      setRouteIndex((prev) => {
+        const total = routePoints.length - 1;
+        if (total <= 0) return prev;
 
-        if (next >= 1) {
-          setStatusText('Ambulance has arrived at your location. Please stay reachable by phone.');
-        } else if (next > 0.65) {
+        const pointsPerTick = Math.max(1, Math.ceil(routePoints.length / 120));
+        const nextIndex = Math.min(prev + pointsPerTick, total);
+        const nextProgress = nextIndex / total;
+        const mins = Math.max(1, Math.ceil((1 - nextProgress) * (etaMins || 1)));
+
+        setProgress(nextProgress);
+
+        if (nextProgress >= 1) {
+          setStatusText('Ambulance has arrived at Potheri SRM University. Please stay reachable by phone.');
+        } else if (nextProgress > 0.7) {
           setStatusText(`Ambulance is nearby. Estimated arrival in ~${mins} min.`);
-        } else if (next > 0.3) {
-          setStatusText(`Ambulance en route. Estimated arrival in ~${mins} min.`);
+        } else if (nextProgress > 0.35) {
+          setStatusText(`Ambulance is following the road route. ETA ~${mins} min.`);
         } else {
-          setStatusText(`Dispatch confirmed from ${nearestHospital?.name}. Estimated arrival in ~${mins} min.`);
+          setStatusText(`Dispatch confirmed from ${nearestHospital?.name}. ETA ~${mins} min.`);
         }
 
-        return next;
+        return nextIndex;
       });
-    }, 1200);
+    }, 800);
 
     return () => clearInterval(timer);
-  }, [requested, etaMins, nearestHospital?.name]);
+  }, [requested, routePoints, etaMins, nearestHospital?.name]);
 
   const handleRequestAmbulance = async () => {
     const normalizedAddress = address.trim();
     if (!normalizedAddress) return;
 
-    setAddressError('');
+    setAddressError('Destination is fixed for simulation: Potheri, SRM University, Chennai 603203.');
     setIsResolvingAddress(true);
 
-    let point;
-    try {
-      point = await geocodeAddress(normalizedAddress);
-    } catch {
-      point = hashAddressToPoint(normalizedAddress);
-      setAddressError('Using approximate map location (simulation) because exact address lookup was unavailable.');
-    } finally {
-      setIsResolvingAddress(false);
-    }
+    const point = POTHERI_SRM_DESTINATION;
 
     const ranked = hospitals
       .map((hospital) => {
-        const coord = hospitalCoordinates[hospital.id] || { lat: 28.61, lng: 77.21 };
+        const coord = hospitalCoordinates[hospital.id] || { lat: 12.9, lng: 80.12 };
         return {
           hospital,
           distance: computeDistance(coord, point),
@@ -153,14 +163,32 @@ function AmbulanceRequestPage() {
       .sort((a, b) => a.distance - b.distance);
 
     const nearest = ranked[0];
-    const simulatedEta = Math.max(4, Math.min(25, Math.round(nearest.distance / 1.2 + 3)));
+    const startPoint = hospitalCoordinates[nearest.hospital.id] || { lat: 12.9, lng: 80.12 };
+
+    let nextRoutePoints = [startPoint, point];
+    let simulatedEta = Math.max(4, Math.min(25, Math.round(nearest.distance / 1.2 + 3)));
+    let simulatedDistance = Number(nearest.distance.toFixed(1));
+
+    try {
+      const route = await fetchRoadRoute(startPoint, point);
+      nextRoutePoints = route.points;
+      simulatedEta = route.durationMinutes;
+      simulatedDistance = route.distanceKm;
+    } catch {
+      // keep fallback straight-line simulation
+    }
+
+    setIsResolvingAddress(false);
 
     setPatientPoint(point);
     setNearestHospital(nearest.hospital);
     setEtaMins(simulatedEta);
+    setRouteDistanceKm(simulatedDistance);
+    setRoutePoints(nextRoutePoints);
+    setRouteIndex(0);
     setProgress(0);
     setRequested(true);
-    setStatusText(`Dispatch confirmed from ${nearest.hospital.name}. Estimated arrival in ~${simulatedEta} min.`);
+    setStatusText(`Dispatch confirmed from ${nearest.hospital.name}. Following road route to Potheri. ETA ~${simulatedEta} min.`);
   };
 
   const resetSimulation = () => {
@@ -168,8 +196,12 @@ function AmbulanceRequestPage() {
     setPatientPoint(null);
     setNearestHospital(null);
     setEtaMins(null);
+    setRouteDistanceKm(null);
     setProgress(0);
+    setRoutePoints([]);
+    setRouteIndex(0);
     setStatusText('');
+    setAddressError('');
   };
 
   return (
@@ -178,14 +210,14 @@ function AmbulanceRequestPage() {
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-med-600">Emergency Support</p>
         <h2 className="mt-1 text-2xl font-bold">Request Ambulance</h2>
         <p className="mt-2 text-sm text-slate-600">
-          Enter your address and we will dispatch the nearest hospital ambulance. This is a live simulation view.
+          Enter any location text to start simulation. Ambulance destination is fixed to Potheri, SRM University, Chennai 603203.
         </p>
 
         <label className="mt-4 block text-sm font-medium text-slate-700">
           Pickup Address
           <textarea
             className="input mt-2 min-h-[92px]"
-            placeholder="Example: House 12, Sector 45, Near Metro Station, Gurugram"
+            placeholder="Enter any location text to start simulation"
             value={address}
             onChange={(event) => setAddress(event.target.value)}
           />
@@ -199,7 +231,7 @@ function AmbulanceRequestPage() {
             onClick={handleRequestAmbulance}
             disabled={!address.trim() || isResolvingAddress}
           >
-            {isResolvingAddress ? 'Locating Address...' : 'Request Ambulance'}
+            {isResolvingAddress ? 'Building Road Route...' : 'Request Ambulance'}
           </button>
           {requested ? (
             <button type="button" className="btn-secondary" onClick={resetSimulation}>
@@ -212,13 +244,17 @@ function AmbulanceRequestPage() {
       <section className="card">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-lg font-semibold">Live Ambulance Tracking</h3>
-          {requested && nearestHospital ? (
+          {requested && nearestHospital && routeDistanceKm !== null ? (
             <p className="text-sm text-slate-600">Nearest Hospital: <span className="font-semibold text-med-700">{nearestHospital.name}</span></p>
           ) : null}
         </div>
 
+        {requested && routeDistanceKm !== null ? (
+          <p className="mt-2 text-xs text-slate-500">Route distance: ~{routeDistanceKm} km • Destination: {POTHERI_SRM_DESTINATION.label}</p>
+        ) : null}
+
         <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3">
-          <MapContainer center={[28.6139, 77.209]} zoom={11} className="h-[380px] rounded-xl border border-slate-200">
+          <MapContainer center={[12.88, 80.08]} zoom={11} className="h-[380px] rounded-xl border border-slate-200">
             <TileLayer
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -244,17 +280,14 @@ function AmbulanceRequestPage() {
                 radius={8}
                 pathOptions={{ color: '#b91c1c', fillColor: '#ef4444', fillOpacity: 0.9 }}
               >
-                <Popup>📍 Patient Pickup Location</Popup>
+                <Popup>📍 Destination: Potheri SRM University</Popup>
               </CircleMarker>
             ) : null}
 
-            {nearestHospitalPoint && patientPoint ? (
+            {routePoints.length ? (
               <Polyline
-                positions={[
-                  [nearestHospitalPoint.lat, nearestHospitalPoint.lng],
-                  [patientPoint.lat, patientPoint.lng],
-                ]}
-                pathOptions={{ color: '#64748b', dashArray: '6 8' }}
+                positions={routePoints.map((point) => [point.lat, point.lng])}
+                pathOptions={{ color: '#2563eb', weight: 5, opacity: 0.8 }}
               />
             ) : null}
 
@@ -264,7 +297,7 @@ function AmbulanceRequestPage() {
               </Marker>
             ) : null}
 
-            <FitToRoute hospitalPoint={nearestHospitalPoint} patientPoint={patientPoint} />
+            <FitToRoute routePoints={routePoints} hospitalPoint={nearestHospitalPoint} patientPoint={patientPoint} />
           </MapContainer>
         </div>
 
@@ -280,7 +313,7 @@ function AmbulanceRequestPage() {
               </div>
               <p className="mt-2 text-xs text-slate-500">Tracking progress: {Math.round(progress * 100)}%</p>
               <p className="mt-2 text-xs text-slate-500">
-                Share this tracking page from your phone to monitor ambulance movement in real-time (simulation).
+                Uber-style road tracking simulation: ambulance follows mapped roads toward Potheri destination.
               </p>
             </>
           ) : (
