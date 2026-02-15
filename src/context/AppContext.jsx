@@ -104,6 +104,107 @@ function inferRiskLevelFromBp(bp) {
   return 'low';
 }
 
+function parseJsonIfPossible(value) {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  let cleaned = trimmed;
+  if (cleaned.startsWith('```')) {
+    cleaned = cleaned.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
+  }
+
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return null;
+    try {
+      return JSON.parse(jsonMatch[0]);
+    } catch {
+      return null;
+    }
+  }
+}
+
+function normalizePriority(priority) {
+  const level = String(priority || '').toLowerCase();
+  if (level === 'high' || level === 'medium' || level === 'low') return level;
+  return 'medium';
+}
+
+function normalizeTestsList(rawTests) {
+  let tests = rawTests;
+
+  if (typeof tests === 'string') {
+    const parsed = parseJsonIfPossible(tests);
+    tests = parsed ?? [];
+  }
+
+  if (!Array.isArray(tests)) return [];
+
+  return tests
+    .map((test, index) => ({
+      id: test?.id || `test-${Date.now()}-${index + 1}`,
+      name: test?.name || 'Recommended test',
+      reason: test?.reason || 'Recommended based on reported symptoms.',
+      priority: normalizePriority(test?.priority),
+      cost: Number.isFinite(Number(test?.cost)) ? Number(test.cost) : 1200,
+    }))
+    .filter((test) => Boolean(test.name));
+}
+
+function normalizeAiResult(rawData) {
+  const fallback = {
+    summary: 'AI analysis completed. Please review the recommendations below.',
+    tests: [],
+    riskLevel: 'Low',
+    confidenceScore: 0,
+    recommendedDepartment: 'General Medicine',
+    reasoning: [],
+    isHealthRelated: true,
+  };
+
+  if (!rawData) return fallback;
+
+  let data = rawData;
+  if (typeof data === 'string') {
+    const parsed = parseJsonIfPossible(data);
+    data = parsed || { ...fallback, summary: data.slice(0, 300) };
+  }
+
+  if (typeof data?.summary === 'string') {
+    const summaryParsed = parseJsonIfPossible(data.summary);
+    if (summaryParsed && typeof summaryParsed === 'object') {
+      data = {
+        ...summaryParsed,
+        ...data,
+        summary: summaryParsed.summary || data.summary,
+      };
+    }
+  }
+
+  const candidate = data?.response && typeof data.response === 'object' ? data.response : data;
+
+  const tests = normalizeTestsList(candidate?.tests ?? candidate?.recommendedTests ?? candidate?.recommended_tests);
+  const summary = typeof candidate?.summary === 'string'
+    ? candidate.summary
+    : typeof candidate?.triageSummary === 'string'
+      ? candidate.triageSummary
+      : fallback.summary;
+
+  return {
+    ...fallback,
+    ...candidate,
+    summary,
+    tests,
+    riskLevel: candidate?.riskLevel || fallback.riskLevel,
+    confidenceScore: Number.isFinite(Number(candidate?.confidenceScore)) ? Number(candidate.confidenceScore) : fallback.confidenceScore,
+    recommendedDepartment: candidate?.recommendedDepartment || fallback.recommendedDepartment,
+    reasoning: Array.isArray(candidate?.reasoning) ? candidate.reasoning : fallback.reasoning,
+  };
+}
+
 const hospitals = [
   {
     id: 'hosp-2',
@@ -719,15 +820,17 @@ export function AppProvider({ children }) {
       }
     }
 
+    const normalized = normalizeAiResult(data);
+
     setState((prev) => ({
       ...prev,
       patientSymptoms: cleanSymptoms,
-      recommendedTests: data.tests,
-      recommendationSummary: data.summary,
-      aiRiskLevel: data.riskLevel || 'Low',
-      aiConfidenceScore: data.confidenceScore || 0,
-      aiRecommendedDepartment: data.recommendedDepartment || 'General Medicine',
-      aiReasoning: data.reasoning || [],
+      recommendedTests: normalized.tests,
+      recommendationSummary: normalized.summary,
+      aiRiskLevel: normalized.riskLevel || 'Low',
+      aiConfidenceScore: normalized.confidenceScore || 0,
+      aiRecommendedDepartment: normalized.recommendedDepartment || 'General Medicine',
+      aiReasoning: normalized.reasoning || [],
     }));
     setLoading((prev) => ({ ...prev, recommendations: false }));
   };
@@ -744,16 +847,17 @@ export function AppProvider({ children }) {
       }
 
       const data = await fetchGeminiRecommendations(symptomsText, fileBase64, mimeType);
+      const normalized = normalizeAiResult(data);
 
       setState((prev) => ({
         ...prev,
         patientSymptoms: symptomsText,
-        recommendedTests: data.tests,
-        recommendationSummary: data.summary,
-        aiRiskLevel: data.riskLevel || 'Low',
-        aiConfidenceScore: data.confidenceScore || 0,
-        aiRecommendedDepartment: data.recommendedDepartment || 'General Medicine',
-        aiReasoning: data.reasoning || [],
+        recommendedTests: normalized.tests,
+        recommendationSummary: normalized.summary,
+        aiRiskLevel: normalized.riskLevel || 'Low',
+        aiConfidenceScore: normalized.confidenceScore || 0,
+        aiRecommendedDepartment: normalized.recommendedDepartment || 'General Medicine',
+        aiReasoning: normalized.reasoning || [],
       }));
     } catch (error) {
       console.error('AI Analysis failed:', error);

@@ -1,14 +1,26 @@
 /**
- * Gemini AI Service — calls Google Generative Language API
+ * AI recommendation service — calls Google Generative Language API
  * to produce symptom-based triage recommendations.
  */
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 const GEMINI_MODEL = import.meta.env.VITE_GEMINI_MODEL || 'gemini-3-flash-preview';
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
 
+function buildGeminiUrl(model) {
+  return `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
+}
+
+function getModelCandidates() {
+  const candidates = [
+    GEMINI_MODEL,
+    'gemini-3-flash-preview',
+    'gemini-3.0-flash',
+  ].filter(Boolean);
+
+  return [...new Set(candidates)];
+}
 /**
- * Build the prompt that instructs Gemini to return structured JSON.
+ * Build the prompt that instructs the AI model to return structured JSON.
  */
 function buildPrompt(symptoms, fileData = null) {
   let context = `You are a medical AI triage assistant for Prognosis Care, a healthcare platform in India.
@@ -169,7 +181,7 @@ export function isSimpleLowRiskSymptomInput(input) {
 }
 
 /**
- * Parse Gemini response text into a structured { summary, tests, riskLevel, ... } object.
+ * Parse AI response text into a structured { summary, tests, riskLevel, ... } object.
  */
 function parseGeminiResponse(text) {
   // Strip markdown code fences if present
@@ -180,7 +192,7 @@ function parseGeminiResponse(text) {
 
   const defaults = {
     isHealthRelated: true,
-    summary: text.slice(0, 300),
+    summary: 'AI analysis completed. Please review the recommendations below.',
     tests: [],
     riskLevel: 'Low',
     confidenceScore: 50,
@@ -188,11 +200,72 @@ function parseGeminiResponse(text) {
     reasoning: []
   };
 
+  const normalizePriority = (priority) => {
+    const value = String(priority || '').toLowerCase();
+    if (value === 'high' || value === 'medium' || value === 'low') return value;
+    return 'medium';
+  };
+
+  const normalizeTests = (input) => {
+    let tests = input;
+
+    if (typeof tests === 'string') {
+      const trimmed = tests.trim();
+      if (!trimmed) return [];
+
+      try {
+        tests = JSON.parse(trimmed);
+      } catch {
+        return [];
+      }
+    }
+
+    if (!Array.isArray(tests)) return [];
+
+    return tests
+      .map((test, index) => ({
+        id: test?.id || `test-${index + 1}`,
+        name: test?.name || 'Recommended test',
+        reason: test?.reason || 'Recommended based on reported symptoms.',
+        priority: normalizePriority(test?.priority),
+        cost: Number.isFinite(Number(test?.cost)) ? Number(test.cost) : 1200,
+      }))
+      .filter((test) => Boolean(test.name));
+  };
+
+  const hydrateFromParsedObject = (parsedObject) => {
+    if (!parsedObject || typeof parsedObject !== 'object') return null;
+
+    const candidate =
+      parsedObject.response && typeof parsedObject.response === 'object'
+        ? parsedObject.response
+        : parsedObject;
+
+    const tests = normalizeTests(candidate.tests ?? candidate.recommendedTests ?? candidate.recommended_tests);
+    const summary =
+      typeof candidate.summary === 'string'
+        ? candidate.summary
+        : typeof candidate.triageSummary === 'string'
+          ? candidate.triageSummary
+          : defaults.summary;
+
+    return {
+      ...defaults,
+      ...candidate,
+      summary,
+      tests,
+      reasoning: Array.isArray(candidate.reasoning) ? candidate.reasoning : [],
+      riskLevel: candidate.riskLevel || defaults.riskLevel,
+      confidenceScore: Number.isFinite(Number(candidate.confidenceScore)) ? Number(candidate.confidenceScore) : defaults.confidenceScore,
+      recommendedDepartment: candidate.recommendedDepartment || defaults.recommendedDepartment,
+    };
+  };
+
   try {
     const parsed = JSON.parse(cleaned);
-    // Validate shape
-    if (parsed.summary && Array.isArray(parsed.tests)) {
-      return { ...defaults, ...parsed };
+    const hydrated = hydrateFromParsedObject(parsed);
+    if (hydrated) {
+      return hydrated;
     }
   } catch {
     // Attempt regex extraction as last resort
@@ -200,8 +273,9 @@ function parseGeminiResponse(text) {
     if (jsonMatch) {
       try {
         const fallback = JSON.parse(jsonMatch[0]);
-        if (fallback.summary && Array.isArray(fallback.tests)) {
-          return { ...defaults, ...fallback };
+        const hydratedFallback = hydrateFromParsedObject(fallback);
+        if (hydratedFallback) {
+          return hydratedFallback;
         }
       } catch {
         // fall through to default
@@ -209,15 +283,18 @@ function parseGeminiResponse(text) {
     }
   }
 
-  return defaults;
+  return {
+    ...defaults,
+    summary: cleaned.slice(0, 300) || defaults.summary,
+  };
 }
 
 /**
- * Call Gemini API with patient symptoms (and optional file), return analysis.
+ * Call AI API with patient symptoms (and optional file), return analysis.
  */
 export async function fetchGeminiRecommendations(symptoms, fileBase64 = null, mimeType = null) {
   if (!GEMINI_API_KEY) {
-    throw new Error('Gemini API key is not configured.');
+    throw new Error('AI service key is not configured.');
   }
 
   const parts = [{ text: buildPrompt(symptoms, fileBase64) }];
@@ -231,32 +308,50 @@ export async function fetchGeminiRecommendations(symptoms, fileBase64 = null, mi
     });
   }
 
-  const response = await fetch(GEMINI_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ parts }],
-      generationConfig: {
-        temperature: 0.4,
-        maxOutputTokens: 1024,
-      },
-    }),
-  });
+  const models = getModelCandidates();
+  let lastError = null;
 
-  if (!response.ok) {
-    const errorBody = await response.text();
-    console.error('Gemini API error:', response.status, errorBody);
-    throw new Error(`Gemini API request failed (${response.status})`);
+  for (const model of models) {
+    try {
+      const response = await fetch(buildGeminiUrl(model), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts }],
+          generationConfig: {
+            temperature: 0.4,
+            maxOutputTokens: 1024,
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.text();
+        lastError = new Error(`AI service request failed (${response.status})`);
+        console.error('AI service error:', response.status, errorBody);
+
+        if ([400, 403, 404, 429, 500, 503].includes(response.status)) {
+          continue;
+        }
+
+        throw lastError;
+      }
+
+      const json = await response.json();
+      const textContent = json?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+      if (!textContent) {
+        lastError = new Error('Empty response from AI service.');
+        continue;
+      }
+
+      return parseGeminiResponse(textContent);
+    } catch (error) {
+      lastError = error;
+    }
   }
 
-  const json = await response.json();
-  const textContent = json?.candidates?.[0]?.content?.parts?.[0]?.text;
-
-  if (!textContent) {
-    throw new Error('Empty response from Gemini API.');
-  }
-
-  return parseGeminiResponse(textContent);
+  throw lastError || new Error('AI service is currently unavailable.');
 }
 
 /**
@@ -288,22 +383,33 @@ export async function fetchChatBotResponse(message, history = []) {
   const prompt = `${systemInstruction}\n\nChat History:\n${historyText}\n\nUser: ${message}\nAssistant:`;
 
   try {
-    const response = await fetch(GEMINI_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.3, // Lower temperature for more deterministic/focused answers
-          maxOutputTokens: 150,
-        },
-      }),
-    });
+    const models = getModelCandidates();
+    for (const model of models) {
+      const response = await fetch(buildGeminiUrl(model), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.3,
+            maxOutputTokens: 150,
+          },
+        }),
+      });
 
-    if (!response.ok) throw new Error('API Error');
+      if (!response.ok) {
+        if ([400, 403, 404, 429, 500, 503].includes(response.status)) {
+          continue;
+        }
+        throw new Error(`API Error (${response.status})`);
+      }
 
-    const json = await response.json();
-    return json?.candidates?.[0]?.content?.parts?.[0]?.text || "I'm having trouble connecting. Please try again.";
+      const json = await response.json();
+      const text = json?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (text) return text;
+    }
+
+    return "I'm having trouble connecting. Please try again.";
   } catch (error) {
     console.error('ChatBot Error:', error);
     return "I'm sorry, I'm having trouble connecting right now.";

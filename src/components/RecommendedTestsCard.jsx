@@ -4,19 +4,21 @@ import { formatINR } from './BillingBreakdown';
 
 function RecommendedTestsCard({ tests = [], summary, onProceed }) {
   const navigate = useNavigate();
-  const total = tests.reduce((sum, test) => sum + test.cost, 0);
+  const safeTests = Array.isArray(tests) ? tests : [];
+  const safeSummary = typeof summary === 'string' ? summary : '';
+  const total = safeTests.reduce((sum, test) => sum + (Number(test.cost) || 0), 0);
 
   const handleProceed = () => {
     onProceed?.();
     navigate('/lab-booking');
   };
 
-  if (!tests.length) {
+  if (!safeTests.length) {
     return (
       <section className="card">
         <h2 className="text-xl font-semibold">Recommended Tests</h2>
         <p className="mt-2 text-sm text-slate-600">
-          {summary || 'No tests are needed right now based on the symptoms provided. If symptoms worsen or continue, consult a doctor.'}
+          {safeSummary || 'No tests are needed right now based on the symptoms provided. If symptoms worsen or continue, consult a doctor.'}
         </p>
       </section>
     );
@@ -27,7 +29,7 @@ function RecommendedTestsCard({ tests = [], summary, onProceed }) {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="text-xl font-semibold">Recommended Tests</h2>
-          <p className="mt-1 text-sm text-slate-600">{summary}</p>
+          <p className="mt-1 text-sm text-slate-600">{safeSummary}</p>
         </div>
         <div className="rounded-xl bg-med-50 px-4 py-2 text-right">
           <p className="text-xs uppercase tracking-wide text-med-700">Estimated Bill</p>
@@ -36,7 +38,7 @@ function RecommendedTestsCard({ tests = [], summary, onProceed }) {
       </div>
 
       <div className="mt-4 grid gap-3">
-        {tests.map((test) => (
+        {safeTests.map((test) => (
           <article key={test.id} className="rounded-xl border border-slate-100 p-4">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div>

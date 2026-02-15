@@ -226,7 +226,7 @@ function TriagePage() {
       {loading.recommendations ? (
         <section className="card text-center py-12">
           <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-med-200 border-t-med-600 mb-4"></div>
-          <p className="text-sm font-medium text-slate-700">Gemini AI is analyzing your inputs...</p>
+          <p className="text-sm font-medium text-slate-700">AI assistant is analyzing your inputs...</p>
           <p className="text-xs text-slate-500 mt-1">Classifying risk & recommending specialists</p>
         </section>
       ) : (
