@@ -17,17 +17,30 @@ function HospitalDashboardPage() {
   // In our mock data, appointments have 'doctor_id'. We can find the doctor and check their hospital.
 
   const hospitalAppointments = useMemo(() => {
-    if (!currentUser?.hospitalName) return [];
+    const hospitalId = currentUser?.hospitalId;
+    const hospitalName = currentUser?.hospitalName?.trim().toLowerCase();
+    if (!hospitalId && !hospitalName) return [];
 
-    return state.appointments.filter(app => {
-      // Direct match if appointment has hospitalName (it might not)
-      if (app.hospitalName === currentUser.hospitalName) return true;
+    return state.appointments.filter((app) => {
+      if (hospitalId && (app.hospital_id === hospitalId || app.hospitalId === hospitalId)) {
+        return true;
+      }
 
-      // Match via doctor
-      const doc = state.doctors.find(d => d.id === app.doctor_id);
-      return doc?.hospitalName === currentUser.hospitalName;
+      if (hospitalName && app.hospitalName?.trim().toLowerCase() === hospitalName) {
+        return true;
+      }
+
+      const doctorRef = app.doctor_id || app.doctorId;
+      const doc = state.doctors.find((doctor) => doctor.id === doctorRef);
+      if (!doc) return false;
+
+      if (hospitalId && doc.hospitalId === hospitalId) {
+        return true;
+      }
+
+      return hospitalName ? doc.hospitalName?.trim().toLowerCase() === hospitalName : false;
     });
-  }, [state.appointments, currentUser?.hospitalName, state.doctors]);
+  }, [state.appointments, currentUser?.hospitalId, currentUser?.hospitalName, state.doctors]);
 
   const doctorAppointments = hospitalAppointments; // Alias for compatibility with existing code structure below
 
@@ -221,11 +234,24 @@ function HospitalDashboardPage() {
                         <span className="font-semibold text-amber-900">Chief Complaint:</span><br />
                         {appointment.reason}
                       </p>
+                      <p className="text-xs text-slate-600 mt-2">
+                        <span className="font-semibold">Doctor:</span> {appointment.doctorName || 'Not specified'}
+                      </p>
                       {appointment.uploadedMedicalFile && (
-                        <p className="text-xs text-blue-600 mt-2 flex items-center gap-1">
+                        <div className="text-xs text-blue-600 mt-2 flex items-center gap-2">
                           <span>📎</span>
-                          <span className="font-semibold">Medical File Attached:</span> {appointment.uploadedMedicalFile.fileName}
-                        </p>
+                          <span><span className="font-semibold">Medical File:</span> {appointment.uploadedMedicalFile.fileName}</span>
+                          {appointment.uploadedMedicalFile.previewUrl ? (
+                            <a
+                              href={appointment.uploadedMedicalFile.previewUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="font-semibold underline"
+                            >
+                              View
+                            </a>
+                          ) : null}
+                        </div>
                       )}
                       <p className="text-xs text-slate-500 mt-2">
                         <span className="font-semibold">Fee:</span> ₹{appointment.consultationFee} •
@@ -292,15 +318,29 @@ function HospitalDashboardPage() {
                         <span className="font-semibold">👤 Patient ID:</span> {appointment.patient_id}
                       </p>
                       <p className="text-slate-700">
+                        <span className="font-semibold">🩺 Doctor:</span> {appointment.doctorName || 'Not specified'}
+                      </p>
+                      <p className="text-slate-700">
                         <span className="font-semibold">🩺 Chief Complaint:</span> {appointment.reason}
                       </p>
                       <p className="text-slate-700">
                         <span className="font-semibold">💵 Consultation Fee:</span> ₹{appointment.consultationFee}
                       </p>
                       {appointment.uploadedMedicalFile && (
-                        <p className="text-xs text-blue-600 flex items-center gap-1 mt-1">
-                          📎 <span className="font-semibold">Attachment:</span> {appointment.uploadedMedicalFile.fileName}
-                        </p>
+                        <div className="text-xs text-blue-600 flex items-center gap-2 mt-1">
+                          <span>📎</span>
+                          <span><span className="font-semibold">Attachment:</span> {appointment.uploadedMedicalFile.fileName}</span>
+                          {appointment.uploadedMedicalFile.previewUrl ? (
+                            <a
+                              href={appointment.uploadedMedicalFile.previewUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="font-semibold underline"
+                            >
+                              View
+                            </a>
+                          ) : null}
+                        </div>
                       )}
                     </div>
                   </div>
@@ -330,7 +370,7 @@ function HospitalDashboardPage() {
             ))}
           </div>
         ) : (
-          <p className="mt-3 text-sm text-slate-500">No appointments found for this doctor.</p>
+          <p className="mt-3 text-sm text-slate-500">No appointments found for this hospital.</p>
         )}
       </section>
 

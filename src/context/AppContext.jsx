@@ -506,12 +506,17 @@ export function AppProvider({ children }) {
 
     const appointmentId = `APT-${Date.now().toString().slice(-8)}`;
     const filePreview = await readFileAsDataURL(file);
+    const appointmentHospital =
+      hospitals.find((hospital) => hospital.id === doctor.hospitalId) || state.selectedHospital;
+    const patientDisplayName = state.patient.name?.trim() || state.patient.id || 'Patient';
 
     const appointment = {
       id: appointmentId,
       patient_id: state.patient.id,
+      patientName: patientDisplayName,
       doctor_id: doctor.id,
       hospital_id: doctor.hospitalId || 'hosp-1',
+      hospitalName: doctor.hospitalName || appointmentHospital?.name || '',
       doctorId: doctor.id,
       doctorName: doctor.fullName,
       department,
@@ -526,6 +531,7 @@ export function AppProvider({ children }) {
           fileName: file.name,
           mimeType: file.type,
           previewUrl: filePreview,
+          uploadedAt: new Date().toISOString(),
         }
         : null,
     };
