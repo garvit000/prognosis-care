@@ -19,6 +19,15 @@ function getModelCandidates() {
 
   return [...new Set(candidates)];
 }
+
+function withTimeoutSignal(timeoutMs = 12000) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  return {
+    signal: controller.signal,
+    clear: () => clearTimeout(timeoutId),
+  };
+}
 /**
  * Build the prompt that instructs the AI model to return structured JSON.
  */
@@ -261,6 +270,22 @@ function parseGeminiResponse(text) {
     };
   };
 
+  const extractSummaryFromJsonLikeText = (jsonLikeText) => {
+    if (!jsonLikeText) return '';
+
+    const quotedSummaryMatch = jsonLikeText.match(/"summary"\s*:\s*"([\s\S]*?)(?<!\\)"/i);
+    if (quotedSummaryMatch?.[1]) {
+      return quotedSummaryMatch[1].replace(/\\n/g, ' ').trim();
+    }
+
+    const looseSummaryMatch = jsonLikeText.match(/summary\s*:\s*([^,}\n]+)/i);
+    if (looseSummaryMatch?.[1]) {
+      return looseSummaryMatch[1].replace(/^"|"$/g, '').trim();
+    }
+
+    return '';
+  };
+
   try {
     const parsed = JSON.parse(cleaned);
     const hydrated = hydrateFromParsedObject(parsed);
@@ -285,7 +310,7 @@ function parseGeminiResponse(text) {
 
   return {
     ...defaults,
-    summary: cleaned.slice(0, 300) || defaults.summary,
+    summary: extractSummaryFromJsonLikeText(cleaned) || defaults.summary,
   };
 }
 
@@ -308,13 +333,15 @@ export async function fetchGeminiRecommendations(symptoms, fileBase64 = null, mi
     });
   }
 
-  const models = getModelCandidates();
+  const models = getModelCandidates().slice(0, 2);
   let lastError = null;
 
   for (const model of models) {
+    const { signal, clear } = withTimeoutSignal(12000);
     try {
       const response = await fetch(buildGeminiUrl(model), {
         method: 'POST',
+        signal,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts }],
@@ -348,6 +375,8 @@ export async function fetchGeminiRecommendations(symptoms, fileBase64 = null, mi
       return parseGeminiResponse(textContent);
     } catch (error) {
       lastError = error;
+    } finally {
+      clear();
     }
   }
 
@@ -383,30 +412,36 @@ export async function fetchChatBotResponse(message, history = []) {
   const prompt = `${systemInstruction}\n\nChat History:\n${historyText}\n\nUser: ${message}\nAssistant:`;
 
   try {
-    const models = getModelCandidates();
+    const models = getModelCandidates().slice(0, 2);
     for (const model of models) {
-      const response = await fetch(buildGeminiUrl(model), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.3,
-            maxOutputTokens: 150,
-          },
-        }),
-      });
+      const { signal, clear } = withTimeoutSignal(10000);
+      try {
+        const response = await fetch(buildGeminiUrl(model), {
+          method: 'POST',
+          signal,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: {
+              temperature: 0.3,
+              maxOutputTokens: 150,
+            },
+          }),
+        });
 
-      if (!response.ok) {
-        if ([400, 403, 404, 429, 500, 503].includes(response.status)) {
-          continue;
+        if (!response.ok) {
+          if ([400, 403, 404, 429, 500, 503].includes(response.status)) {
+            continue;
+          }
+          throw new Error(`API Error (${response.status})`);
         }
-        throw new Error(`API Error (${response.status})`);
-      }
 
-      const json = await response.json();
-      const text = json?.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (text) return text;
+        const json = await response.json();
+        const text = json?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (text) return text;
+      } finally {
+        clear();
+      }
     }
 
     return "I'm having trouble connecting. Please try again.";

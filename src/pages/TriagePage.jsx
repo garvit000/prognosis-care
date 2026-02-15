@@ -91,13 +91,12 @@ function TriagePage() {
     }
     setError('');
 
-    // Use the new analyzeWithDocs function if available, otherwise fall back (though analyzeWithDocs handles both)
-    if (analyzeWithDocs) {
+    if (selectedFile && analyzeWithDocs) {
       await analyzeWithDocs(symptoms, selectedFile);
-    } else {
-      // Fallback for older context if not refreshed yet
-      await loadRecommendations(symptoms);
+      return;
     }
+
+    await loadRecommendations(symptoms);
   };
 
   return (
