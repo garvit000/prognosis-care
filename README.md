@@ -80,7 +80,7 @@ Responsive React frontend for an AI-powered healthcare triage and medical assist
 - Reports visible in medical records
 - Download PDF button (simulation)
 
-### Authentication (Firebase)
+### Authentication
 
 - Public routes:
 	- `/login`
@@ -161,4 +161,5 @@ Build for production:
 ```bash
 npm run build
 ```
+
 
